@@ -1,4 +1,4 @@
-// Outils partagés : DOM, bruitages synthétisés, voix de l'animateur, confettis, écran allumé.
+﻿// Outils partagés : DOM, bruitages synthétisés, voix de l'animateur, confettis, écran allumé.
 /* global window, document */
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -127,29 +127,63 @@ const SFX = (() => {
 // Architecture évolutive : il suffira plus tard de remplacer speak() par une voix enregistrée ou une API TTS.
 // ---------------------------------------------------------------------------
 const Voice = (() => {
+  const KEY = 'showtime-voice';
   let enabled = true; let voice = null;
+  let preferred = null;
+  try { preferred = localStorage.getItem(KEY); } catch { /* navigation privée */ }
   const synth = window.speechSynthesis;
+
+  // Qualité estimée d'une voix : les voix « naturelles » (Edge) et Google sonnent bien moins robotiques.
+  const quality = (v) => (/natural|neural|online/i.test(v.name) ? 3 : /google/i.test(v.name) ? 2 : /premium|enhanced|amélior|siri/i.test(v.name) ? 2 : 0);
+  function list() {
+    if (!synth) return [];
+    return synth.getVoices().filter((v) => /^fr(-|_|$)/i.test(v.lang))
+      .sort((a, b) => quality(b) - quality(a) || (/fr-FR/i.test(b.lang) ? 1 : 0) - (/fr-FR/i.test(a.lang) ? 1 : 0));
+  }
   function choose() {
-    if (!synth) return;
-    const fr = synth.getVoices().filter((v) => /^fr(-|_|$)/i.test(v.lang));
-    const rank = (v) => (/natural|neural|online/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 2 : 0) + (/fr-FR/i.test(v.lang) ? 1 : 0);
-    voice = fr.sort((a, b) => rank(b) - rank(a))[0] || null;
+    const l = list();
+    voice = l.find((v) => v.name === preferred) || l[0] || null;
   }
   if (synth) { choose(); synth.onvoiceschanged = choose; }
+
+  // Petites corrections de prononciation et pauses naturelles.
+  function prepare(text) {
+    return text
+      .replace(/[\p{Extended_Pictographic}‍️]/gu, '')
+      .replace(/SHOWTIME/gi, 'Chô-taïme')
+      .replace(/…/g, ', ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   return {
     get supported() { return !!synth; },
     get enabled() { return enabled; },
     set enabled(v) { enabled = v; if (!v && synth) synth.cancel(); },
+    voices: () => list().map((v) => ({ name: v.name, natural: quality(v) >= 2 })),
+    get current() { return voice ? voice.name : ''; },
+    get natural() { return !!voice && quality(voice) >= 2; },
+    use(name) {
+      preferred = name;
+      try { localStorage.setItem(KEY, name); } catch { /* */ }
+      choose();
+    },
+    /** Lit le texte phrase par phrase : les pauses entre phrases rendent la voix plus vivante. */
     speak(text, onStart, onEnd) {
       if (!synth || !enabled || !text) { if (onEnd) onEnd(); return; }
-      const clean = text.replace(/[\p{Extended_Pictographic}‍️]/gu, '').trim();
       synth.cancel();
-      const u = new SpeechSynthesisUtterance(clean);
-      u.lang = 'fr-FR'; if (voice) u.voice = voice;
-      u.rate = 1.05; u.pitch = 1.05;
-      if (onStart) u.onstart = onStart;
-      if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
-      synth.speak(u);
+      const sentences = prepare(text).split(/(?<=[.!?])\s+/).filter(Boolean);
+      const good = voice && quality(voice) >= 2;
+      sentences.forEach((sentence, i) => {
+        const u = new SpeechSynthesisUtterance(sentence);
+        u.lang = voice ? voice.lang : 'fr-FR';
+        if (voice) u.voice = voice;
+        u.rate = good ? 1.02 : 0.95;
+        u.pitch = 1;
+        if (i === 0 && onStart) u.onstart = onStart;
+        if (i === sentences.length - 1 && onEnd) { u.onend = onEnd; u.onerror = onEnd; }
+        synth.speak(u);
+      });
     },
   };
 })();

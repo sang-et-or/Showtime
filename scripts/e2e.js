@@ -14,10 +14,10 @@ const assert = (cond, msg) => { if (!cond) throw new Error(`ÉCHEC : ${msg}`); c
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Phases où l'on attend les joueurs : l'hôte n'appuie pas sur « Suivant » pendant celles-ci.
 const INPUT = new Set(['writing', 'quizQuestion', 'whoVote', 'defiGet', 'defiAct', 'defiVote', 'duelBet', 'duelQ',
-  'bacWrite', 'bacReview', 'undVote', 'penduPlay', 'estAsk']);
+  'bacWrite', 'bacReview', 'undVote', 'penduPlay', 'estAsk', 'ludoPlay', 'rouePlay', 'roueQ', 'vieTurn', 'moisTurn']);
 
 async function main() {
-  const server = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
+  const server = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env: { ...process.env, PORT: String(PORT), SHOWTIME_GAME_CAP_MS: '30000' }, stdio: 'ignore' });
   try {
     for (let i = 0; i < 50; i++) { try { if ((await fetch(`${URL}/healthz`)).ok) break; } catch { await sleep(100); } }
 
@@ -78,7 +78,8 @@ async function main() {
       assert(showPhases.includes(p), `Grand Show : phase « ${p} » jouée`);
     }
 
-    const QUICK = { petitbac: ['bacWrite', 'bacReview', 'bacReveal'], undercover: ['undClues', 'undVote', 'undReveal', 'undEnd'], pendu: ['penduPlay', 'penduReveal'], estimation: ['estAsk', 'estReveal'] };
+    const QUICK = { petitbac: ['bacWrite', 'bacReview', 'bacReveal'], undercover: ['undClues', 'undVote', 'undReveal', 'undEnd'], pendu: ['penduPlay', 'penduReveal'], estimation: ['estAsk', 'estReveal'],
+      ludo: ['ludoPlay', 'ludoEnd'], roue: ['rouePlay', 'roueQ', 'roueA', 'roueEnd'], vie: ['vieTurn', 'vieEvent', 'vieEnd'], mois: ['moisTurn', 'moisEvent', 'moisEnd'] };
     for (const [game, expected] of Object.entries(QUICK)) {
       host.emit('host:action', { type: 'restart' });
       await sleep(200);

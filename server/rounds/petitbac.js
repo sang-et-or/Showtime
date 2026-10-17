@@ -1,4 +1,4 @@
-// Partie rapide « Petit Bac » : une lettre, 5 catégories, réponses originales récompensées.
+﻿// Partie rapide « Petit Bac » : une lettre, 5 catégories, réponses originales récompensées.
 const animator = require('../animator');
 const { CATEGORIES, LETTERS } = require('../content/petitbac');
 const { shuffle, sanitizeText, norm } = require('../util');
@@ -102,6 +102,9 @@ module.exports = {
   icon: '📝',
   subtitle: 'Une lettre, cinq catégories. Le premier qui a tout rempli crie STOP !',
   pitch: 'Une lettre, 5 catégories : prénom, pays, animal… Le plus original gagne.',
+  rules: 'Une lettre est tirée au sort. Remplissez les 5 catégories sur votre téléphone ; le premier qui a tout rempli crie STOP. Ensuite, contestez les réponses douteuses : une réponse unique vaut 100, une réponse en double 50.',
+  players: '1 à 12 joueurs',
+  duration: '5 à 10 min',
   minPlayers: 1,
   phases: ['bacWrite', 'bacReview', 'bacReveal'],
 

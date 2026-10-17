@@ -1,4 +1,4 @@
-// Partie rapide « Mot mystère » (pendu) : lettres proposées depuis les téléphones,
+﻿// Partie rapide « Mot mystère » (pendu) : lettres proposées depuis les téléphones,
 // chaque bonne lettre rapporte des points, et on peut tenter le mot entier.
 const animator = require('../animator');
 const WORDS = require('../content/pendu');
@@ -51,6 +51,9 @@ module.exports = {
   icon: '🔤',
   subtitle: 'Proposez des lettres, trouvez le mot avant que les erreurs s’accumulent !',
   pitch: 'Le pendu en équipe : chaque bonne lettre rapporte, le mot entier encore plus.',
+  rules: 'Proposez des lettres sur votre téléphone : chaque bonne lettre rapporte des points, chaque erreur rapproche du pendu. Sûr de vous ? Tentez le mot entier !',
+  players: '1 à 12 joueurs',
+  duration: '5 à 10 min',
   minPlayers: 1,
   phases: ['penduPlay', 'penduReveal'],
 

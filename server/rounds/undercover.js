@@ -1,4 +1,4 @@
-// Partie rapide « L'Imposteur » : tout le monde a le même mot secret, sauf l'imposteur.
+﻿// Partie rapide « L'Imposteur » : tout le monde a le même mot secret, sauf l'imposteur.
 // Tour d'indices à voix haute, puis vote pour éliminer un suspect.
 const animator = require('../animator');
 const PAIRS = require('../content/undercover');
@@ -88,6 +88,9 @@ module.exports = {
   icon: '🕵️',
   subtitle: 'Tout le monde a le même mot secret… sauf un. Démasquez l’imposteur !',
   pitch: 'Un mot secret pour tous, sauf l’imposteur. Indices à voix haute et vote.',
+  rules: 'Tout le monde reçoit le même mot secret, sauf l’imposteur qui en a un proche. Chacun dit un mot d’indice à voix haute, puis on vote pour éliminer un suspect. L’imposteur gagne s’il survit !',
+  players: '3 à 12 joueurs',
+  duration: '5 à 15 min',
   minPlayers: 3,
   phases: ['undClues', 'undVote', 'undReveal', 'undEnd'],
 

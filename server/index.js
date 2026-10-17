@@ -1,4 +1,4 @@
-// Point d'entrée : serveur HTTP (fichiers statiques + QR code) et temps réel (Socket.IO).
+﻿// Point d'entrée : serveur HTTP (fichiers statiques + QR code) et temps réel (Socket.IO).
 
 const path = require('path');
 const http = require('http');
@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const QRCode = require('qrcode');
-const { Room } = require('./room');
+const { Room, catalog } = require('./room');
 const { sanitizeText } = require('./util');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -77,6 +77,8 @@ app.get('/api/join-info', async (req, res) => {
   }
 });
 
+app.get('/api/catalog', (req, res) => res.json(catalog()));
+
 app.get('/healthz', (req, res) => res.json({ ok: true, rooms: rooms.size }));
 
 // ---------- salons ----------
@@ -120,7 +122,8 @@ io.on('connection', (socket) => {
     if (rooms.size >= MAX_ROOMS) return ack(cb, { error: 'Serveur complet, réessayez plus tard.' });
     const code = newCode();
     const room = new Room(code, send);
-    if (opts && (opts.mode === 'remote' || opts.mode === 'local')) room.settings.mode = opts.mode;
+    // La page d'accueil peut pré-choisir le mode, le format et le jeu.
+    if (opts && typeof opts === 'object') room.updateSettings({ mode: opts.mode, format: opts.format, game: opts.game });
     rooms.set(code, room);
     room.hostSocket = socket.id;
     socket.data = { code, role: 'host' };

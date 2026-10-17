@@ -127,6 +127,38 @@ const lines = {
   estExact: (name) => pick([`PILE ! ${name} a trouvé la réponse exacte ! Incroyable !`, `${name} tombe pile dessus ! Jackpot !`]),
   estClosest: (name) => pick([`${name} vise le plus juste !`, `Le meilleur tir, c'est ${name} !`]),
 
+  // ----- Petits Chevaux -----
+  ludoIntro: () => pick([
+    `Les Petits Chevaux ! Un 6 ou un 1 pour sortir, un 6 pour rejouer, et pas de pitié pour les adversaires !`,
+    `En selle pour les Petits Chevaux ! Que le meilleur cavalier gagne !`,
+  ]),
+  ludoCapture: (name, victims) => pick([`${name} renvoie ${victims} au box ! Sans pitié !`, `Aïe ! ${name} mange ${victims} !`]),
+  ludoHome: (name) => pick([`Un cheval de ${name} rentre à l'écurie !`, `${name} rentre un cheval au paddock !`]),
+  ludoSix: (name) => pick([`Un 6 ! ${name} rejoue !`, `Six ! Encore à toi, ${name} !`]),
+  ludoWin: (name) => pick([`${name} rentre tous ses chevaux et remporte la course !`, `Victoire au galop pour ${name} !`]),
+
+  // ----- La Roue des Savoirs -----
+  roueIntro: () => pick([
+    `La Roue des Savoirs ! Avancez, répondez, et collectionnez les étoiles de chaque thème !`,
+    `Bienvenue sur la Roue des Savoirs ! Une bonne réponse, et vous rejouez !`,
+  ]),
+  roueAsk: (name, cat) => pick([`Question ${cat} pour ${name} !`, `${name}, thème ${cat}. Tout le monde peut répondre aussi !`]),
+  roueStar: (name, cat) => pick([`Case étoile ! ${name}, une bonne réponse en ${cat} et l'étoile est à toi !`, `Attention, étoile ${cat} en jeu pour ${name} !`]),
+  roueRight: (name) => pick([`Bonne réponse, ${name} rejoue !`, `Bravo ${name}, on continue !`]),
+  roueStarWon: (name) => pick([`${name} décroche une étoile !`, `Une étoile de plus pour ${name} !`]),
+  roueWrong: (name) => pick([`Raté pour ${name}, au suivant !`, `Pas cette fois, ${name}. La main passe !`]),
+  roueWin: (name) => pick([`${name} a toutes ses étoiles et remporte la Roue des Savoirs !`, `Bravo ${name}, maître incontesté de la Roue des Savoirs !`]),
+
+  // ----- Jeux de parcours -----
+  vieIntro: () => pick([
+    `Le Chemin de la Vie ! Études, bébés, maison, coups de chance et coups durs… Qui partira à la retraite le plus riche ?`,
+    `Faites tourner la roue de la vie ! Argent fictif, émotions bien réelles !`,
+  ]),
+  moisIntro: () => pick([
+    `Fin de Mois ! Factures, bonnes affaires et loto : qui bouclera son budget avec le plus d'argent ?`,
+    `Un mois entier de surprises dans la boîte aux lettres ! Gardez un œil sur votre budget !`,
+  ]),
+
   finalIntro: () => pick([
     `Le moment tant attendu… La Grande Finale ! Roulement de tambour…`,
     `Mesdames et messieurs, voici le classement final. Le suspense est insoutenable !`,

@@ -9,7 +9,7 @@
 
 const animator = require('./animator');
 const { CATEGORIES } = require('./content/questions');
-const { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, ownerOf } = require('./rounds');
+const { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, ownerOf } = require('./rounds');
 const { token, shortId } = require('./util');
 
 const MAX_PLAYERS = 12;
@@ -207,7 +207,7 @@ class Room {
     const se = this.settings;
     if (s.mode === 'local' || s.mode === 'remote') se.mode = s.mode;
     if (s.format === 'show' || s.format === 'quick') se.format = s.format;
-    if (QUICK_GAMES.includes(s.game)) se.game = s.game;
+    if (QUICK_GAMES.includes(s.game) || BOARD_GAMES.includes(s.game)) se.game = s.game;
     if (LENGTHS.includes(s.length)) se.length = s.length;
     if (s.rounds && typeof s.rounds === 'object') {
       const next = { ...se.rounds };
@@ -391,9 +391,9 @@ class Room {
 function catalog() {
   const info = (id) => {
     const m = ROUNDS[id];
-    return { id, title: m.title, icon: m.icon, pitch: m.pitch, min: m.minPlayers || 1 };
+    return { id, title: m.title, icon: m.icon, pitch: m.pitch, rules: m.rules || m.subtitle, players: m.players || '', duration: m.duration || '', min: m.minPlayers || 1 };
   };
-  return { show: SHOW_ROUNDS.map(info), quick: QUICK_GAMES.map(info) };
+  return { show: SHOW_ROUNDS.map(info), quick: QUICK_GAMES.map(info), board: BOARD_GAMES.map(info) };
 }
 
-module.exports = { Room, MAX_PLAYERS };
+module.exports = { Room, MAX_PLAYERS, catalog };

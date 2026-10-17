@@ -30,7 +30,7 @@ socket.on('connect', () => {
     if (!saved || saved.code !== room) return expired();
     socket.emit('host:resume', { code: saved.code, hostToken: saved.token }, (res) => { if (res.error) expired(); else ready(); });
   } else if (params.get('new')) {
-    socket.emit('host:create', { mode: params.get('new') === 'remote' ? 'remote' : 'local' }, (res) => {
+    socket.emit('host:create', { mode: params.get('new') === 'remote' ? 'remote' : 'local', format: params.get('format'), game: params.get('game') }, (res) => {
       if (res.error) { toast(res.error, 6000); return; }
       saveHost(res.code, res.hostToken);
       history.replaceState(null, '', `/host?room=${res.code}`);
@@ -77,9 +77,35 @@ $('#open-curtain').addEventListener('click', () => {
 });
 $('#btn-skip').addEventListener('click', () => action('skip'));
 $('#btn-end').addEventListener('click', () => { if (confirm('Passer directement à la Grande Finale ?')) action('end'); });
-$('#btn-voice').addEventListener('click', (e) => {
-  Voice.enabled = !Voice.enabled;
-  e.currentTarget.setAttribute('aria-pressed', String(Voice.enabled));
+$('#btn-home').addEventListener('click', () => {
+  if (confirm('Annuler la partie en cours et revenir au salon ?\nLes joueurs restent connectés : vous pourrez choisir un autre jeu.')) action('restart');
+});
+
+// Menu « voix de l'animateur » : activer/couper, choisir la voix, tester.
+$('#btn-voice').addEventListener('click', () => {
+  if ($('.voice-pop')) { $('.voice-pop').remove(); return; }
+  const voices = Voice.voices();
+  const select = h('select', { class: 'voice-select', 'aria-label': 'Voix' }, ...voices.map((v) => h('option', { value: v.name, text: `${v.natural ? '⭐ ' : ''}${v.name}` })));
+  select.value = Voice.current;
+  select.addEventListener('change', () => { Voice.use(select.value); speak('Bonsoir ! Ici Max Paillettes, prêt pour le show !'); paint(); });
+  const toggle = h('button', { class: 'chip' });
+  const tip = h('p', { class: 'voice-tip' });
+  function paint() {
+    toggle.textContent = Voice.enabled ? '🔊 Voix activée' : '🔇 Voix coupée';
+    toggle.classList.toggle('on', Voice.enabled);
+    $('#btn-voice').setAttribute('aria-pressed', String(Voice.enabled));
+    tip.textContent = Voice.natural
+      ? '⭐ Voix naturelle sélectionnée.'
+      : 'Astuce : pour une voix bien plus naturelle (et gratuite), ouvrez le plateau dans Microsoft Edge, puis choisissez une voix marquée ⭐ « Online (Natural) ». Sur Chrome, préférez « Google français ».';
+  }
+  toggle.addEventListener('click', () => { Voice.enabled = !Voice.enabled; paint(); });
+  const pop = h('div', { class: 'voice-pop panel', role: 'dialog', 'aria-label': 'Voix de l’animateur' },
+    h('b', { text: '🗣️ Voix de Max Paillettes' }), toggle,
+    voices.length ? select : h('p', { text: 'Aucune voix française trouvée sur cet appareil.' }),
+    h('button', { class: 'chip', onclick: () => speak('Mesdames et messieurs, bienvenue sur le plateau de Chô-taïme ! Ce soir, c’est vous les stars !') }, '▶️ Tester'),
+    tip);
+  paint();
+  document.body.append(pop);
 });
 $('#btn-sound').addEventListener('click', (e) => {
   SFX.muted = !SFX.muted;
@@ -146,6 +172,7 @@ function render(s) {
   $('#round-label').textContent = roundLabel(s);
   $('#btn-skip').hidden = !s.canSkip || s.phase === 'lobby';
   $('#btn-end').hidden = ['lobby', 'final'].includes(s.phase);
+  $('#btn-home').hidden = s.phase === 'lobby';
 
   // Nouveaux arrivants : petit « pop » sonore.
   const ids = new Set(s.players.map((p) => p.id));
@@ -216,24 +243,30 @@ const VIEWS = {
         const se = st.settings;
         const cat = st.catalog;
         const online = st.players.filter((p) => p.connected).length;
-        const formatCard = (id, icon, title, desc) => h('button', {
-          class: `format-card${se.format === id ? ' on' : ''}`, 'aria-pressed': String(se.format === id), onclick: () => send({ format: id }),
-        }, h('span', { class: 'fi', text: icon }), h('b', { text: title }), h('small', { text: desc }));
-        const gameCard = (g) => h('button', {
-          class: `game-card${se.game === g.id ? ' on' : ''}`, 'aria-pressed': String(se.game === g.id), onclick: () => send({ game: g.id }),
-        }, h('span', { class: 'fi', text: g.icon }), h('b', { text: g.title }), h('small', { text: g.pitch }),
-        g.min > 1 ? h('em', { class: online < g.min ? 'warn' : '', text: `${g.min} joueurs min.` }) : '');
+        const allGames = [...cat.quick, ...cat.board];
+        const game = allGames.find((g) => g.id === se.game) || allGames[0];
         const usesQuiz = se.format === 'show' && (se.rounds.quiz || se.rounds.duel);
+        const changeBtn = h('button', { class: 'btn ghost', onclick: () => openPicker(st) }, '🔄 Changer de jeu');
+
+        // Grande carte « programme choisi », lisible de loin.
+        const hero = se.format === 'show'
+          ? h('div', { class: 'prog-hero' },
+            h('span', { class: 'prog-ic', text: '🎬' }),
+            h('div', { class: 'prog-txt' }, h('small', { text: 'Programme' }), h('b', { text: 'Le Grand Show' }),
+              h('span', { text: 'Plusieurs manches, classements et podium final. Cochez les manches :' })),
+            changeBtn)
+          : h('div', { class: 'prog-hero' },
+            h('span', { class: 'prog-ic', text: game.icon }),
+            h('div', { class: 'prog-txt' }, h('small', { text: cat.board.some((g) => g.id === game.id) ? 'Jeu de plateau' : 'Partie rapide' }), h('b', { text: game.title }),
+              h('span', { text: game.rules }),
+              h('em', { class: online < game.min ? 'warn' : '', text: `👥 ${game.players} · ⏱ ${game.duration}` })),
+            changeBtn);
 
         settings.replaceChildren(
-          h('h3', { text: '🎛️ Programme de la soirée' }),
-          h('div', { class: 'format-row' },
-            formatCard('show', '🎬', 'Le Grand Show', 'Plusieurs manches et un podium final'),
-            formatCard('quick', '⚡', 'Partie rapide', 'Un seul jeu, 5 à 15 minutes')),
+          hero,
           se.format === 'show'
-            ? h('div', { class: 'row' }, h('span', { text: 'Manches' }),
-              ...cat.show.map((r) => chip(`${r.icon} ${r.title}`, se.rounds[r.id], () => send({ rounds: { ...se.rounds, [r.id]: !se.rounds[r.id] } }))))
-            : h('div', { class: 'game-grid' }, ...cat.quick.map(gameCard)),
+            ? h('div', { class: 'row' }, ...cat.show.map((r) => chip(`${r.icon} ${r.title}`, se.rounds[r.id], () => send({ rounds: { ...se.rounds, [r.id]: !se.rounds[r.id] } }))))
+            : '',
           usesQuiz ? h('div', { class: 'row' }, h('span', { text: 'Thèmes du quiz' }),
             ...Object.entries(st.categories).map(([k, c]) => chip(`${c.icon} ${c.label}`, se.categories.includes(k), () => {
               const cats = se.categories.includes(k) ? se.categories.filter((x) => x !== k) : [...se.categories, k];
@@ -243,12 +276,12 @@ const VIEWS = {
             chip('Courte', se.length === 'short', () => send({ length: 'short' })),
             chip('Normale', se.length === 'normal', () => send({ length: 'normal' })),
             chip('Longue', se.length === 'long', () => send({ length: 'long' }))),
-          h('div', { class: 'row' }, h('span', { text: 'Mode' }),
+          h('div', { class: 'row' }, h('span', { text: 'Joueurs' }),
             chip('🛋️ Même pièce', se.mode === 'local', () => send({ mode: 'local' })),
             chip('🌍 À distance', se.mode === 'remote', () => send({ mode: 'remote' }))),
         );
 
-        const needed = se.format === 'quick' ? (cat.quick.find((g) => g.id === se.game)?.min || 1) : 1;
+        const needed = se.format === 'quick' ? game.min : 1;
         startBtn.disabled = online < 1;
         hint.textContent = online < 1 ? 'Il faut au moins une star pour commencer.'
           : online < needed ? `Ce jeu se joue à ${needed} minimum : attendez encore ${needed - online} star(s).`
@@ -447,6 +480,24 @@ const VIEWS = {
   },
 };
 
+/** Grand sélecteur de jeux en plein écran (salon). */
+function openPicker(st) {
+  const cat = st.catalog;
+  const close = () => overlay.remove();
+  const pickIt = (patch) => { action('settings', { settings: { ...state.settings, ...patch } }); SFX.pop(); close(); };
+  const tile = (g) => h('button', { class: `tile${st.settings.format === 'quick' && st.settings.game === g.id ? ' on' : ''}`, onclick: () => pickIt({ format: 'quick', game: g.id }) },
+    h('span', { class: 'tile-ic', text: g.icon }), h('b', { text: g.title }), h('span', { class: 'tile-pitch', text: g.pitch }),
+    h('small', { class: 'tile-meta', text: `👥 ${g.players} · ⏱ ${g.duration}` }));
+  const overlay = h('div', { class: 'picker-overlay', onclick: (e) => { if (e.target === overlay) close(); } },
+    h('div', { class: 'picker' },
+      h('div', { class: 'picker-head' }, h('h2', { text: 'Choisissez votre jeu' }), h('button', { class: 'tool', 'aria-label': 'Fermer', onclick: close }, '✕')),
+      h('button', { class: `show-card${st.settings.format === 'show' ? ' on' : ''}`, onclick: () => pickIt({ format: 'show' }) },
+        h('span', { class: 'show-ic', text: '🎬' }),
+        h('span', { class: 'show-txt' }, h('b', { text: 'Le Grand Show' }), h('span', { text: 'Plusieurs manches et un podium final.' }))),
+      h('h3', { class: 'family', text: '⚡ Parties rapides' }), h('div', { class: 'tile-grid' }, ...cat.quick.map(tile)),
+      h('h3', { class: 'family', text: '🎲 Jeux de plateau' }), h('div', { class: 'tile-grid' }, ...cat.board.map(tile))));
+  document.body.append(overlay);
+}
 function countUp(el, from, to, ms) {
   const t0 = performance.now();
   (function f(now) {

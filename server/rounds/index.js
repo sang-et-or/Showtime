@@ -21,11 +21,16 @@ const modules = [
   require('./undercover'),
   require('./pendu'),
   require('./estimation'),
+  require('./ludo'),
+  require('./roue'),
+  require('./vie'),
+  require('./mois'),
 ];
 
 const ROUNDS = Object.fromEntries(modules.map((m) => [m.id, m]));
 const SHOW_ROUNDS = ['quiz', 'whosaid', 'defi', 'duel'];
 const QUICK_GAMES = ['petitbac', 'undercover', 'pendu', 'estimation'];
+const BOARD_GAMES = ['ludo', 'roue', 'vie', 'mois'];
 
 const PHASE_OWNER = new Map();
 for (const m of modules) {
@@ -36,4 +41,4 @@ for (const m of modules) {
 }
 const ownerOf = (phase) => PHASE_OWNER.get(phase) || null;
 
-module.exports = { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, ownerOf };
+module.exports = { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, ownerOf };

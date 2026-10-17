@@ -1,4 +1,4 @@
-// Partie rapide « L'Estimation » : une réponse chiffrée, le plus proche gagne.
+﻿// Partie rapide « L'Estimation » : une réponse chiffrée, le plus proche gagne.
 const animator = require('../animator');
 const QUESTIONS = require('../content/estimation');
 const { shuffle } = require('../util');
@@ -51,6 +51,9 @@ module.exports = {
   icon: '🎯',
   subtitle: 'Tapez un nombre : le plus proche gagne, la réponse exacte rapporte le jackpot !',
   pitch: 'Années, distances, quantités : tapez un nombre, le plus proche gagne.',
+  rules: 'Une question, une réponse chiffrée : année, distance, quantité… Tapez votre estimation, le plus proche gagne, et la réponse exacte rapporte le jackpot !',
+  players: '1 à 12 joueurs',
+  duration: '5 à 10 min',
   minPlayers: 1,
   phases: ['estAsk', 'estReveal'],
 

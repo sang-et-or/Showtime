@@ -102,6 +102,23 @@ function startBot(url, code, index, { log = () => {}, speed = 1 } = {}) {
         case 'estAsk':
           if (s.mine == null) later(() => act({ type: 'guess', value: String(rnd(3000)) }));
           break;
+        // ----- jeux de plateau -----
+        case 'ludoPlay':
+          if (s.ludo.isTurn && s.ludo.stage === 'roll') later(() => act({ type: 'roll' }), 300, 700);
+          if (s.ludo.isTurn && s.ludo.stage === 'choose') later(() => act({ type: 'choose', h: pickOne(s.ludo.options).h }), 300, 700);
+          break;
+        case 'rouePlay':
+          if (s.roue.isTurn && s.stage === 'roll') later(() => act({ type: 'roll' }), 300, 700);
+          break;
+        case 'roueQ':
+          if (s.mine == null) later(() => act({ type: 'answer', choice: rnd(4) }), 400, 1500);
+          break;
+        case 'vieTurn': case 'moisTurn':
+          if (s.track.isTurn && s.stage === 'roll') later(() => act({ type: 'roll' }), 300, 700);
+          break;
+        case 'vieEvent': case 'moisEvent':
+          if (s.track.isTurn && s.choice && !s.chosen) later(() => act({ type: 'decide', yes: Math.random() < 0.5 }), 400, 900);
+          break;
         default:
       }
     });

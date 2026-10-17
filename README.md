@@ -12,6 +12,11 @@ Dans le salon, l'hôte choisit son programme :
 | 🎭 **Défi Surprise** : mimes à faire deviner, défis notés par le public | 🔤 **Le Mot mystère** : pendu collectif, lettres et mot entier |
 | ⚔️ **Le Grand Duel** : face-à-face, le public mise des points virtuels | 🎯 **L'Estimation** : un nombre, le plus proche gagne |
 
+**🎲 Jeux de plateau** (dés, pions, plateau animé à la télé) : 🐴 **Les Petits Chevaux** (2 à 4 joueurs) ·
+🎡 **La Roue des Savoirs** (quiz sur plateau, étoiles à collectionner) · 🛤️ **Le Chemin de la Vie** (parcours de vie, fortune virtuelle) ·
+📅 **Fin de Mois** (calendrier, factures et bonnes affaires, argent fictif).
+Les trois derniers sont *inspirés* de grands classiques, mais avec nos propres noms, plateaux, règles et contenus.
+
 Et partout : QR code et code à 4 lettres, prénoms et avatars, classements animés, **Grande Finale**
 avec compte à rebours, podium et confettis, animateur virtuel « Max Paillettes » (textes + voix),
 bruitages synthétisés, durée Courte / Normale / Longue, mode même pièce ou à distance,
@@ -177,7 +182,7 @@ toutes les saisies nettoyées et bornées, affichage sans injection HTML, limita
 | --- | --- | --- |
 | **V1 – Prototype jouable** | salon + QR, avatars, Grand Quiz, Qui a osé dire ça ?, classements, Grande Finale, animateur texte + voix, mode distant, reconnexion | ✅ fait |
 | **Vague 1 – Plus de jeux** | menu Grand Show / Partie rapide ; **Défi Surprise**, **Grand Duel** ; parties rapides **Petit Bac**, **L'Imposteur**, **Mot mystère**, **L'Estimation** ; réglage de durée | ✅ fait |
-| **Vague 2 – Jeux de plateau** | Petits chevaux ; quiz à camemberts (inspiré de Trivial Pursuit, sous un autre nom) ; parcours de vie (inspiré de Destin) ; jeu du mois (inspiré de La Bonne Paye) | à venir |
+| **Vague 2 – Jeux de plateau** | Petits Chevaux, Roue des Savoirs, Chemin de la Vie, Fin de Mois ; nouvelle page d'accueil ; bouton 🏠 Accueil pendant les parties ; choix de la voix | ✅ fait |
 | **Vague 3 – Contenu et finitions** | centaines de questions avec niveaux, nouveaux thèmes, animateur plus personnalisé, épreuve dédiée de Grande Finale, règles réglables | à venir |
 | **V3 – Version commerciale** | découverte gratuite ≈ 15 min puis **Soirée premium à 4,99 €** via Stripe Checkout (paiement côté hôte uniquement, webhook qui « débloque » le salon) ; packs de questions thématiques ; personnalisation (nom de l'équipe, questions perso) ; base de données légère (SQLite/Postgres) pour les achats ; Redis si plusieurs serveurs | à démarrer quand le jeu plaît |
 | **V4 – Animateur augmenté** | voix plus naturelles (TTS en ligne), répliques générées par IA à partir du contexte de la partie, avatar animé | l'animateur est déjà isolé dans `animator.js` et `Voice.speak()` |
@@ -203,7 +208,7 @@ Après une modification, relancez `npm start` (ou utilisez `npm run dev`, qui re
 ## 6. Limites connues du prototype
 
 - Les parties sont en mémoire : un redémarrage du serveur les efface, et il faut un seul serveur (pas de répartition de charge).
-- La voix de synthèse dépend de l'appareil : très naturelle sur Edge (voix « Online/Natural »), plus robotique ailleurs.
-  Elle peut être coupée avec 🗣️.
+- La voix de synthèse dépend du navigateur. Pour une voix **naturelle et gratuite**, ouvrez le plateau dans **Microsoft Edge**
+  puis, dans le menu 🗣️, choisissez une voix marquée ⭐ « Online (Natural) ». Sur Chrome, prenez « Google français ».
 - Sur iPhone, le vibreur n'est pas disponible (limitation d'Apple) ; tout le reste fonctionne.
 - Aucune musique : seuls des bruitages générés par le navigateur sont utilisés (aucun droit d'auteur).
