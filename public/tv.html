@@ -1,0 +1,41 @@
+﻿<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SHOWTIME – Sur la télé</title>
+  <meta name="theme-color" content="#0b0420">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css?v=15">
+</head>
+<body>
+  <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+  <main class="tv-pair">
+    <div class="logo">SHOWTIME</div>
+    <h1>📺 Afficher le plateau sur cette télé</h1>
+    <p>Sur l’ordinateur de l’animateur, touchez <b>📺 Télé</b> : un code à 6 chiffres s’affiche. Tapez-le ici.</p>
+    <form id="tv-form" class="tv-form" novalidate>
+
+      <input id="pin" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="123456" aria-label="Code télé à 6 chiffres" autofocus>
+      <button class="btn gold big" type="submit">Afficher le plateau ▶</button>
+    </form>
+    <p class="error hidden" id="err" role="alert"></p>
+  </main>
+  <script>
+    const input = document.getElementById('pin');
+    const err = document.getElementById('err');
+    const pre = new URLSearchParams(location.search).get('pin');
+    if (pre) input.value = pre.replace(/\D/g, '').slice(0, 6);
+    input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); err.classList.add('hidden'); });
+    document.getElementById('tv-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!/^\d{6}$/.test(input.value)) { err.textContent = 'Le code télé fait 6 chiffres.'; err.classList.remove('hidden'); return; }
+      location.href = `/host?tv=${input.value}`;
+    });
+  </script>
+</body>
+</html>

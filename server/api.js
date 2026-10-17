@@ -169,6 +169,7 @@ function createApi({ rooms }) {
     const room = rooms.get(String(req.get('x-room') || '').toUpperCase());
     if (!room) return null;
     if (req.get('x-host-token') && req.get('x-host-token') === room.hostToken) return { room, host: true };
+    if (req.get('x-tv-pin') && req.get('x-tv-pin') === room.tvPin) return { room, tv: true }; // la télé peut afficher les photos, rien d'autre
     const p = room.players.get(String(req.get('x-player-id') || ''));
     if (p && p.token === req.get('x-player-token')) return { room, player: p };
     return null;

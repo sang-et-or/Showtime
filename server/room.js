@@ -28,6 +28,7 @@ class Room {
     this.code = code;
     this.send = send;
     this.hostToken = token();
+    this.tvPin = String(crypto.randomInt(100000, 1000000)); // code à 6 chiffres pour afficher le plateau sur une télé
     this.hostSocket = null;
     this.spectators = new Set(); // téléphones qui affichent l'écran télé
     this.players = new Map();
@@ -181,6 +182,12 @@ class Room {
   }
 
   /** Un joueur affiche l'écran télé sur son téléphone (mode à distance). */
+  /** Une télé (ou tout autre écran) affiche le plateau en lecture seule, grâce au code télé. */
+  addTv(socketId) {
+    this.spectators.add(socketId);
+    this.sync();
+  }
+
   addSpectator(socketId, pid, tok) {
     const p = this.players.get(pid);
     if (!p || p.token !== tok) return false;
@@ -524,7 +531,7 @@ class Room {
   hostView() {
     const d = this.data;
     const base = {
-      role: 'host', code: this.code, phase: this.phase, key: this.phase, settings: this.settings, line: this.line, ...this.timing(),
+      role: 'host', code: this.code, tvPin: this.tvPin, tvCount: this.tvCount || 0, phase: this.phase, key: this.phase, settings: this.settings, line: this.line, ...this.timing(),
       canSkip: !!this.pendingNext && !this.paused, paused: this.pauseInfo(), canPause: this.phase !== 'lobby' && this.phase !== 'final',
       players: [...this.players.values()].map((p) => ({ ...this.publicPlayer(p), score: p.score, connected: p.connected })),
       categories: CATEGORIES, clubs: CLUBS,
@@ -581,7 +588,7 @@ class Room {
     if (this.hostSocket || this.spectators.size) {
       const view = this.hostView();
       if (this.hostSocket) this.send(this.hostSocket, 'state', view);
-      for (const sid of this.spectators) this.send(sid, 'state', { ...view, spectator: true });
+      for (const sid of this.spectators) this.send(sid, 'state', { ...view, spectator: true, tvPin: undefined });
     }
     for (const p of this.players.values()) {
       if (p.connected && p.socketId) this.send(p.socketId, 'state', this.playerView(p));

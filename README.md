@@ -103,6 +103,13 @@ sécurité de base, coupure et reconnexion d'un joueur, toutes les phases, cohé
 Un joueur qui perd le réseau ou verrouille son téléphone **retrouve sa place automatiquement** en rouvrant la page.
 L'hôte peut aussi recharger sa page sans perdre la partie.
 
+**📺 Mettre le plateau sur la télé.** Sur l'écran de l'animateur, touchez **📺 Télé** en haut. Trois solutions s'affichent :
+1. **Télé connectée** (Smart TV, Android TV, box, console) : ouvrez le navigateur internet de la télé, allez sur l'adresse du site suivie de `/tv` (par exemple `https://votre-site.onrender.com/tv`), puis tapez le **code télé à 6 chiffres** affiché sur l'ordinateur.
+2. **Chromecast ou Google TV** : dans Chrome ou Edge, touchez **📡 Caster sur la télé** (ou menu ⋮ → « Caster… »).
+3. **Câble HDMI** : ⊞ Windows + P → « Dupliquer ». Sans câble, essayez ⊞ Windows + K (télé compatible Miracast).
+
+Avec les solutions 1 et 2, la télé affiche le spectacle et l'ordinateur reste la télécommande. Le son passe alors sur la télé, et l'ordinateur coupe le sien automatiquement.
+
 **Pause.** Chaque joueur peut mettre la partie en pause avec le bouton ⏸️ en haut de son téléphone, et l'hôte peut le faire avec **⏸️ Pause**.
 Tout s'arrête : le minuteur est figé là où il en était. N'importe qui (joueur ou hôte) peut toucher **▶️ Reprendre la partie**, et le jeu repart au même endroit.
 Si personne ne reprend dans les **50 minutes**, la partie s'arrête et le classement final s'affiche. Un compte à rebours est visible sur tous les écrans.

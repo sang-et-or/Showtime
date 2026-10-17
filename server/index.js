@@ -95,6 +95,8 @@ function newCode() {
   throw new Error('Plus de codes disponibles');
 }
 
+const tvAttempts = new Map();
+setInterval(() => { const now = Date.now(); for (const [k, v] of tvAttempts) if (now > v.reset) tvAttempts.delete(k); }, 60_000).unref();
 const cleanCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
 const AVATAR_RE = /^[\p{Extended_Pictographic}\p{Emoji_Component}‍️]{1,8}$/u;
 
@@ -188,6 +190,23 @@ io.on('connection', (socket) => {
     ack(cb, { ok: true });
   });
 
+  // Une télé affiche le plateau : elle tape le code télé à 6 chiffres montré par l'hôte (essais limités).
+  socket.on('tv:watch', (msg, cb) => {
+    const ip = socket.handshake.address;
+    const now = Date.now();
+    const a = tvAttempts.get(ip) || { n: 0, reset: now + 60_000 };
+    if (now > a.reset) { a.n = 0; a.reset = now + 60_000; }
+    a.n++; tvAttempts.set(ip, a);
+    if (a.n > 15) return ack(cb, { error: 'Trop d’essais, patientez une minute.' });
+    const pin = String((msg && msg.pin) || '').replace(/\D/g, '');
+    const room = pin.length === 6 ? [...rooms.values()].find((r) => r.tvPin === pin) : null;
+    if (!room) return ack(cb, { error: 'Code télé inconnu. Vérifiez les 6 chiffres affichés sur l’ordinateur.' });
+    socket.data = { code: room.code, role: 'tv' };
+    room.tvCount = (room.tvCount || 0) + 1;
+    room.addTv(socket.id);
+    ack(cb, { code: room.code });
+  });
+
   // Un joueur à distance affiche l'écran télé sur son téléphone (lecture seule).
   socket.on('spectator:watch', (msg, cb) => {
     const room = rooms.get(cleanCode(msg && msg.code));
@@ -212,6 +231,7 @@ io.on('connection', (socket) => {
     clearInterval(refill);
     const room = roomOfSocket();
     if (room) room.disconnectSocket(socket.id);
+    if (room && socket.data.role === 'tv') { room.tvCount = Math.max(0, (room.tvCount || 1) - 1); room.sync(); }
   });
 });
 

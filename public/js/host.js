@@ -7,6 +7,9 @@ let params = new URLSearchParams(location.search);
 // Mode « mini-écran » : la page télé affichée en lecture seule dans le téléphone d'un joueur à distance.
 const SPECTATE = params.get('spectate') === '1';
 if (SPECTATE) document.body.classList.add('mini');
+// Mode « télé » : le plateau affiché sur une télé (Chromecast, navigateur de la télé…), en lecture seule.
+const TV_PIN = /^\d{6}$/.test(params.get('tv') || '') ? params.get('tv') : null;
+if (TV_PIN) document.body.classList.add('tv');
 let state = null;
 let viewKey = null;
 let view = null; // { update(state) } de la vue courante
@@ -28,6 +31,7 @@ const saveHost = (code, token) => { try { localStorage.setItem(STORE, JSON.strin
 socket.on('connect', () => {
   $('.offline-banner')?.remove();
   if (SPECTATE) { spectate(); return; }
+  if (TV_PIN) { watchTv(); return; }
   const saved = loadHost();
   const room = params.get('room');
   if (room) {
@@ -61,6 +65,7 @@ function photoAuth() {
     const ident = JSON.parse(localStorage.getItem('showtime-player') || '{}');
     return { 'x-room': ident.code, 'x-player-id': ident.playerId, 'x-player-token': ident.token };
   }
+  if (TV_PIN) return { 'x-room': state?.code || '', 'x-tv-pin': TV_PIN };
   const saved = loadHost();
   return { 'x-room': saved.code, 'x-host-token': saved.token };
 }
@@ -95,6 +100,54 @@ function spectate() {
     if (res.error) $('#view').replaceChildren(h('div', { class: 'round-intro' }, h('p', { text: 'Écran indisponible : rejoins d’abord la partie.' })));
   });
 }
+
+/** La télé se connecte avec le code télé ; le rideau reste pour débloquer le son (une touche de la télécommande). */
+function watchTv() {
+  socket.emit('tv:watch', { pin: TV_PIN }, (res) => {
+    if (res.error) {
+      $('#curtain').classList.add('hidden');
+      $('#view').replaceChildren(h('div', { class: 'round-intro' }, h('div', { class: 'icon', text: '📺' }), h('h1', { text: 'Code télé inconnu' }),
+        h('p', { text: res.error }), h('a', { class: 'btn gold big', href: '/tv', text: 'Retaper le code' })));
+      return;
+    }
+    if (curtainOpen) return;
+    const b = $('#open-curtain');
+    b.disabled = false;
+    b.textContent = 'Afficher le plateau 📺';
+    b.focus();
+  });
+}
+
+/** Panneau « Sur la télé » : Chromecast en un clic, code télé pour les télés connectées, ou câble HDMI. */
+function openTvPanel() {
+  if ($('.tv-pop')) { $('.tv-pop').remove(); return; }
+  const pin = state.tvPin;
+  const base = joinInfo ? new URL(joinInfo.url).origin : location.origin;
+  const tvUrl = `${location.origin}/host?tv=${pin}`;
+  const close = () => pop.remove();
+  const castBtn = 'PresentationRequest' in window ? h('button', { class: 'btn gold', onclick: async () => {
+    try {
+      const req = new PresentationRequest([tvUrl]);
+      await req.start();
+      toast('📺 Plateau envoyé sur la télé ! Touchez « Afficher le plateau » avec la télécommande si besoin.', 6000);
+      close();
+    } catch (e) { if (e.name !== 'AbortError' && e.name !== 'NotAllowedError') toast('Aucune télé compatible trouvée. Essayez le menu ⋮ de Chrome → « Caster… ».', 6000); }
+  } }, '📡 Caster sur la télé (Chromecast, Google TV)') : '';
+  const pop = h('div', { class: 'tv-pop panel', role: 'dialog', 'aria-label': 'Afficher le plateau sur la télé' },
+    h('div', { class: 'tv-pop-head' }, h('b', { text: '📺 Mettre le plateau sur la télé' }), h('button', { class: 'tool', 'aria-label': 'Fermer', onclick: close }, '✕')),
+    state.tvCount ? h('p', { class: 'tv-ok', text: `✅ ${state.tvCount} écran${state.tvCount > 1 ? 's' : ''} télé connecté${state.tvCount > 1 ? 's' : ''}` }) : '',
+    h('section', {}, h('h4', { text: '1. Télé connectée (Smart TV, Android TV, box, console)' }),
+      h('p', {}, 'Ouvrez le navigateur internet de la télé, allez sur ', h('b', { text: `${base.replace(/^https?:\/\//, '')}/tv` }), ' puis tapez ce code :'),
+      h('div', { class: 'tv-pin', text: pin.replace(/(\d{3})(\d{3})/, '$1 $2') })),
+    h('section', {}, h('h4', { text: '2. Chromecast ou Google TV' }),
+      castBtn || h('p', { text: 'Ouvrez ce plateau dans Google Chrome ou Microsoft Edge pour caster en un clic.' }),
+      h('p', { class: 'muted', text: 'Autre solution : menu ⋮ de Chrome → « Caster… » → choisissez la télé (l’onglet entier s’affiche).' })),
+    h('section', {}, h('h4', { text: '3. Avec un câble HDMI ou en Wi-Fi (Windows)' }),
+      h('p', { class: 'muted', text: 'Branchez l’ordinateur à la télé avec un câble HDMI, puis appuyez sur ⊞ Windows + P → « Dupliquer ». Sans câble : ⊞ Windows + K pour choisir une télé compatible Miracast. Puis ⛶ pour le plein écran.' })),
+    h('p', { class: 'muted small', text: 'Avec les solutions 1 et 2, l’ordinateur reste votre télécommande : Suivant, Pause, réglages… et la télé affiche le spectacle.' }));
+  document.body.append(pop);
+}
+$('#btn-tv').addEventListener('click', () => openTvPanel());
 
 function ready() {
   const b = $('#open-curtain');
@@ -232,8 +285,15 @@ function render(s) {
   $('#btn-skip').hidden = !s.canSkip || s.phase === 'lobby';
   $('#btn-end').hidden = ['lobby', 'final'].includes(s.phase);
   $('#btn-home').hidden = s.phase === 'lobby';
+  $('#btn-tv').hidden = !s.tvPin;
+  // Une télé affiche le plateau : le son sort de la télé, on le coupe sur l'ordinateur (et on le rétablit si elle se déconnecte).
+  if (!TV_PIN && !SPECTATE && prev && !!s.tvCount !== !!prev.tvCount) {
+    SFX.muted = !!s.tvCount; Voice.enabled = !s.tvCount;
+    $('#btn-sound').setAttribute('aria-pressed', String(!SFX.muted));
+    toast(s.tvCount ? '📺 Télé connectée ! Le son sort maintenant de la télé (coupé sur l’ordinateur).' : '📺 Télé déconnectée : le son revient sur l’ordinateur.', 5000);
+  }
   $('#btn-pause').hidden = !s.canPause || !!s.paused;
-  PauseOverlay.set(s.paused, SPECTATE ? null : () => action('resume'));
+  PauseOverlay.set(s.paused, SPECTATE || TV_PIN ? null : () => action('resume'));
 
   // Nouveaux arrivants : petit « pop » sonore.
   const ids = new Set(s.players.map((p) => p.id));
