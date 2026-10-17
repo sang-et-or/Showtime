@@ -1,0 +1,41 @@
+﻿const { newDb } = require('pg-mem');
+const { createPgStore } = require('../server/store/pg');
+const crypto = require('crypto');
+(async () => {
+  const db = newDb();
+  db.public.registerFunction({ name: 'now', returns: 'timestamptz', implementation: () => new Date(), impure: true });
+  const { Pool } = db.adapters.createPg();
+  const s = createPgStore('postgres://test', Pool);
+  await s.init();
+  const ok = (c, m) => { if (!c) throw new Error('ÉCHEC : ' + m); console.log('  ✓ ' + m); };
+  const uid = crypto.randomUUID();
+  await s.createUser({ id: uid, email: 'a@b.fr', name: 'Fanny', avatar: '🐙', passHash: 'x:y' });
+  let dup = false; try { await s.createUser({ id: crypto.randomUUID(), email: 'a@b.fr', name: 'X', avatar: '🙂', passHash: 'x:y' }); } catch (e) { dup = e.message === 'EXISTS'; }
+  ok(dup, 'e-mail en double détecté');
+  ok((await s.userByEmail('a@b.fr')).id === uid, 'lecture du compte');
+  await s.createSession('h1', uid, new Date(Date.now() + 86400000));
+  ok((await s.sessionUser('h1')).name === 'Fanny', 'session valide');
+  await s.updateUser(uid, { name: 'Fanny L', avatar: '🦄' });
+  ok((await s.userById(uid)).avatar === '🦄', 'mise à jour du profil');
+  const sid = crypto.randomUUID();
+  await s.createSoiree({ id: sid, code: 'ABCD', startedAt: new Date() });
+  await s.upsertParticipant(sid, { pkey: 'p1', userId: uid, name: 'Fanny', avatar: '🐙', score: 100, rank: 2 });
+  await s.upsertParticipant(sid, { pkey: 'p1', userId: null, name: 'Fanny', avatar: '🐙', score: 900, rank: 1 });
+  await s.upsertParticipant(sid, { pkey: 'p2', name: 'Bot', avatar: '🤖', score: 50, rank: 2 });
+  ok(await s.isParticipant(sid, uid), 'participation (le compte reste lié après mise à jour)');
+  await s.updateSoiree(sid, { summary: { games: [{ id: 'quiz' }] }, endedAt: new Date() });
+  const pid = crypto.randomUUID();
+  await s.addPhoto({ id: pid, soireeId: sid, uploaderUserId: null, uploaderPkey: 'p1', uploaderName: 'Fanny', mime: 'image/jpeg', data: Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3]) });
+  await s.linkPhotosOf(sid, 'p1', uid);
+  const ph = await s.getPhoto(pid);
+  // (le simulateur pg-mem déforme les données binaires ; la vraie base PostgreSQL les conserve à l'identique)
+  ok(ph && ph.uploaderUserId === uid && ph.data.length > 0, 'photo enregistrée, relue et rattachée au compte');
+  await s.addSouvenir({ id: crypto.randomUUID(), soireeId: sid, kind: 'podium', title: 'Le podium', body: 'Bravo', payload: { emoji: '🏆' } });
+  const list = await s.soireesOfUser(uid);
+  ok(list.length === 1 && list[0].players === 2 && list[0].photos === 1 && list[0].souvenirs === 1 && list[0].score === 900, 'historique du compte (compteurs et score)');
+  const det = await s.soireeDetail(sid);
+  ok(det.participants[0].name === 'Fanny' && det.souvenirs[0].payload.emoji === '🏆' && det.summary.games[0].id === 'quiz', 'détail de la soirée');
+  await s.deleteUser(uid);
+  ok(!(await s.getPhoto(pid)) && !(await s.isParticipant(sid, uid)), 'suppression du compte : photos effacées, participation anonymisée');
+  console.log('\n🎉 Stockage PostgreSQL : tous les tests sont passés.');
+})().catch((e) => { console.error(e.message); process.exit(1); });

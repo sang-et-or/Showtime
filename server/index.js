@@ -9,6 +9,8 @@ const { Server } = require('socket.io');
 const QRCode = require('qrcode');
 const { Room, catalog } = require('./room');
 const { sanitizeText } = require('./util');
+const { createApi, userFromCookie } = require('./api');
+const store = require('./store');
 
 const PORT = Number(process.env.PORT) || 3000;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sans I ni O, pour éviter les confusions
@@ -79,6 +81,8 @@ app.get('/api/join-info', async (req, res) => {
 
 app.get('/api/catalog', (req, res) => res.json(catalog()));
 
+app.use('/api', createApi({ rooms }));
+
 app.get('/healthz', (req, res) => res.json({ ok: true, rooms: rooms.size }));
 
 // ---------- salons ----------
@@ -123,7 +127,8 @@ io.on('connection', (socket) => {
     const code = newCode();
     const room = new Room(code, send);
     // La page d'accueil peut pré-choisir le mode, le format et le jeu.
-    if (opts && typeof opts === 'object') room.updateSettings({ mode: opts.mode, format: opts.format, game: opts.game });
+    if (opts && opts.mode === 'remote') room.settings.vote = true;
+    if (opts && typeof opts === 'object') room.updateSettings({ mode: opts.mode, format: opts.format, game: opts.game, categories: typeof opts.themes === 'string' ? opts.themes.split(',') : undefined });
     rooms.set(code, room);
     room.hostSocket = socket.id;
     socket.data = { code, role: 'host' };
@@ -152,18 +157,21 @@ io.on('connection', (socket) => {
       case 'settings': return room.updateSettings(msg.settings);
       case 'restart': return room.restart();
       case 'end': return room.endNow();
+      case 'nudge': return room.nudge();
+      case 'cancelStart': return room.cancelAutoStart();
       default:
     }
   });
 
   // --- joueurs ---
-  socket.on('player:join', (msg, cb) => {
+  socket.on('player:join', async (msg, cb) => {
     const room = rooms.get(cleanCode(msg && msg.code));
     if (!room) return ack(cb, { error: 'Aucun salon avec ce code. Vérifie les 4 lettres affichées à l’écran !' });
     const name = sanitizeText(msg.name, 16);
     if (name.length < 1) return ack(cb, { error: 'Choisis un prénom !' });
     const avatar = typeof msg.avatar === 'string' && AVATAR_RE.test(msg.avatar) ? msg.avatar : '🙂';
-    const res = room.addPlayer(name, avatar, socket.id);
+    const user = await userFromCookie(socket.handshake.headers.cookie); // joueur connecté à son compte ?
+    const res = room.addPlayer(name, avatar, socket.id, user ? user.id : null);
     if (res.error) return ack(cb, { error: res.error });
     socket.data = { code: room.code, role: 'player', pid: res.player.id };
     ack(cb, { code: room.code, playerId: res.player.id, token: res.player.token });
@@ -175,6 +183,15 @@ io.on('connection', (socket) => {
     const p = room && room.resumePlayer(String(msg.playerId || ''), String(msg.token || ''), socket.id);
     if (!p) return ack(cb, { error: 'Session expirée' });
     socket.data = { code: room.code, role: 'player', pid: p.id };
+    ack(cb, { ok: true });
+  });
+
+  // Un joueur à distance affiche l'écran télé sur son téléphone (lecture seule).
+  socket.on('spectator:watch', (msg, cb) => {
+    const room = rooms.get(cleanCode(msg && msg.code));
+    const ok = room && room.addSpectator(socket.id, String(msg.playerId || ''), String(msg.token || ''));
+    if (!ok) return ack(cb, { error: 'Accès refusé' });
+    socket.data = { code: room.code, role: 'spectator' };
     ack(cb, { ok: true });
   });
 
@@ -195,6 +212,8 @@ io.on('connection', (socket) => {
     if (room) room.disconnectSocket(socket.id);
   });
 });
+
+store.init().then(() => console.log(`  💾 Stockage : ${store.kind}`)).catch((e) => console.error('Stockage indisponible :', e.message));
 
 server.listen(PORT, () => {
   const ip = lanAddress();

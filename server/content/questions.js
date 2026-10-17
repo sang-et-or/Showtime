@@ -1,15 +1,30 @@
-// Banque de questions du Grand Quiz.
+﻿// Banque de questions du Grand Quiz.
 // Format : { cat, q, a: [bonne réponse, mauvaise 1, mauvaise 2, mauvaise 3] }
 // La bonne réponse est TOUJOURS en premier ici ; l'ordre est mélangé à chaque partie.
 // Pour ajouter des questions : copier une ligne, garder la bonne réponse en premier.
 
+// group : famille d'affichage dans le salon ; adult : réservé aux adultes, jamais proposé par défaut.
 const CATEGORIES = {
-  culture: { label: 'Culture générale', icon: '🧠' },
-  musique: { label: 'Musique', icon: '🎵' },
-  cinema: { label: 'Cinéma', icon: '🎬' },
-  sport: { label: 'Sport', icon: '🏅' },
-  foot: { label: 'Football', icon: '⚽' },
+  culture: { label: 'Culture générale', icon: '🧠', group: 'Culture' },
+  geo: { label: 'Géographie', icon: '🌍', group: 'Culture' },
+  histoire: { label: 'Histoire', icon: '🏰', group: 'Culture' },
+  cuisine: { label: 'Cuisine', icon: '🍽️', group: 'Culture' },
+  nord: { label: 'Hauts-de-France', icon: '⛏️', group: 'Culture' },
+  musique: { label: 'Musique', icon: '🎵', group: 'Divertissement' },
+  cinema: { label: 'Cinéma', icon: '🎬', group: 'Divertissement' },
+  tele: { label: 'Télé & séries', icon: '📺', group: 'Divertissement' },
+  jeux: { label: 'Jeux vidéo', icon: '🎮', group: 'Divertissement' },
+  annees80: { label: 'Années 80', icon: '📼', group: 'Époques' },
+  annees90: { label: 'Années 90', icon: '💿', group: 'Époques' },
+  annees2000: { label: 'Années 2000', icon: '📱', group: 'Époques' },
+  sport: { label: 'Sport', icon: '🏅', group: 'Sport' },
+  foot: { label: 'Football', icon: '⚽', group: 'Sport' },
+  footfun: { label: 'Foot insolite', icon: '🤪', group: 'Sport' },
+  clubs: { label: 'Clubs de L1', icon: '🏟️', group: 'Sport' },
+  coquin: { label: 'Coquin', icon: '🌶️', group: 'Pour adultes', adult: true },
 };
+// Thèmes proposés par défaut (tout public).
+const DEFAULT_CATEGORIES = ['culture', 'musique', 'cinema', 'sport', 'foot'];
 
 const QUESTIONS = [
   // Culture générale
@@ -72,4 +87,7 @@ const QUESTIONS = [
   { cat: 'foot', q: 'Combien vaut un but marqué directement sur coup franc direct ?', a: ['1 but, comme les autres', '2 buts', '1 but et demi', 'Il ne compte pas'] },
 ];
 
-module.exports = { CATEGORIES, QUESTIONS };
+QUESTIONS.push(...require('./quiz-themes'), ...require('./quiz-clubs').QUESTIONS);
+const { CLUBS } = require('./quiz-clubs');
+
+module.exports = { CATEGORIES, DEFAULT_CATEGORIES, QUESTIONS, CLUBS };

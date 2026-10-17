@@ -14,7 +14,8 @@ const assert = (cond, msg) => { if (!cond) throw new Error(`ÉCHEC : ${msg}`); c
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Phases où l'on attend les joueurs : l'hôte n'appuie pas sur « Suivant » pendant celles-ci.
 const INPUT = new Set(['writing', 'quizQuestion', 'whoVote', 'defiGet', 'defiAct', 'defiVote', 'duelBet', 'duelQ',
-  'bacWrite', 'bacReview', 'undVote', 'penduPlay', 'estAsk', 'ludoPlay', 'rouePlay', 'roueQ', 'vieTurn', 'moisTurn']);
+  'bacWrite', 'bacReview', 'undVote', 'penduPlay', 'estAsk', 'ludoPlay', 'rouePlay', 'roueQ', 'vieTurn', 'moisTurn',
+  'batFlip', 'bjBet', 'bjPlay', 'pkPlay', 'blBid', 'blPlay', 'prPlay', 'htPlay']);
 
 async function main() {
   const server = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env: { ...process.env, PORT: String(PORT), SHOWTIME_GAME_CAP_MS: '30000' }, stdio: 'ignore' });
@@ -78,9 +79,11 @@ async function main() {
       assert(showPhases.includes(p), `Grand Show : phase « ${p} » jouée`);
     }
 
-    const QUICK = { petitbac: ['bacWrite', 'bacReview', 'bacReveal'], undercover: ['undClues', 'undVote', 'undReveal', 'undEnd'], pendu: ['penduPlay', 'penduReveal'], estimation: ['estAsk', 'estReveal'],
-      ludo: ['ludoPlay', 'ludoEnd'], roue: ['rouePlay', 'roueQ', 'roueA', 'roueEnd'], vie: ['vieTurn', 'vieEvent', 'vieEnd'], mois: ['moisTurn', 'moisEvent', 'moisEnd'] };
-    for (const [game, expected] of Object.entries(QUICK)) {
+    const QUICK = { quiz: ['quizQuestion', 'quizReveal'], petitbac: ['bacWrite', 'bacReview', 'bacReveal'], undercover: ['undClues', 'undVote', 'undReveal', 'undEnd'], pendu: ['penduPlay', 'penduReveal'], estimation: ['estAsk', 'estReveal'],
+      ludo: ['ludoPlay', 'ludoEnd'], roue: ['rouePlay', 'roueQ', 'roueA', 'roueEnd'], vie: ['vieTurn', 'vieEvent', 'vieEnd'], mois: ['moisTurn', 'moisEvent', 'moisEnd'],
+      bataille: ['batFlip', 'batReveal', 'batEnd'], blackjack: ['bjBet', 'bjPlay', 'bjDealer', 'bjResult', 'bjEnd'], poker: ['pkPlay', 'pkShow', 'pkEnd'],
+      belote: ['blBid', 'blPlay', 'blEnd'], president: ['prPlay', 'prResult', 'prEnd'], huit: ['htPlay', 'htResult', 'htEnd'] };
+    for (const [game, expected] of Object.entries(QUICK).filter(([g]) => !process.env.ONLY || process.env.ONLY.split(',').includes(g))) {
       host.emit('host:action', { type: 'restart' });
       await sleep(200);
       host.emit('host:action', { type: 'settings', settings: { format: 'quick', game, length: 'short' } });
@@ -94,6 +97,17 @@ async function main() {
     host.emit('host:action', { type: 'restart' });
     await sleep(300);
     assert(hs.phase === 'lobby' && hs.players.every((p) => p.score === 0), '« Rejouer » remet les scores à zéro');
+
+    // « Je suis prêt » : quand tout le monde est prêt, la partie se lance toute seule après le compte à rebours.
+    bots.slice(0, 3).forEach((b) => b.socket.emit('player:act', { type: 'ready', on: true }));
+    await sleep(400);
+    assert(hs.ready.length === 3 && !hs.autoStart, '3 joueurs prêts sur 4 : pas encore de lancement');
+    assert(bots[3].state.othersWaiting === true, 'le retardataire voit « les autres t’attendent »');
+    bots[3].socket.emit('player:act', { type: 'ready', on: true });
+    await sleep(400);
+    assert(hs.autoStart && hs.timer && hs.remainingMs > 8000, 'tous prêts : compte à rebours de 10 s lancé');
+    await sleep(10_500);
+    assert(hs.phase !== 'lobby', `lancement automatique de la partie (phase « ${hs.phase} »)`);
 
     host.close(); bots.forEach((b) => b.socket.close());
     console.log('\n🎉 Tous les tests sont passés.');

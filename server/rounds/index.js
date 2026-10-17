@@ -1,4 +1,4 @@
-// Catalogue des jeux. Pour ajouter un jeu : créer un module dans ce dossier
+﻿// Catalogue des jeux. Pour ajouter un jeu : créer un module dans ce dossier
 // (voir quiz.js comme modèle) puis l'ajouter à SHOW_ROUNDS et/ou QUICK_GAMES.
 //
 // Un module expose :
@@ -25,12 +25,19 @@ const modules = [
   require('./roue'),
   require('./vie'),
   require('./mois'),
+  require('./cards/bataille'),
+  require('./cards/blackjack'),
+  require('./cards/poker'),
+  require('./cards/belote'),
+  require('./cards/president'),
+  require('./cards/huit'),
 ];
 
 const ROUNDS = Object.fromEntries(modules.map((m) => [m.id, m]));
 const SHOW_ROUNDS = ['quiz', 'whosaid', 'defi', 'duel'];
-const QUICK_GAMES = ['petitbac', 'undercover', 'pendu', 'estimation'];
+const QUICK_GAMES = ['quiz', 'petitbac', 'undercover', 'pendu', 'estimation'];
 const BOARD_GAMES = ['ludo', 'roue', 'vie', 'mois'];
+const CARD_GAMES = ['belote', 'poker', 'president', 'huit', 'blackjack', 'bataille'];
 
 const PHASE_OWNER = new Map();
 for (const m of modules) {
@@ -41,4 +48,4 @@ for (const m of modules) {
 }
 const ownerOf = (phase) => PHASE_OWNER.get(phase) || null;
 
-module.exports = { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, ownerOf };
+module.exports = { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, CARD_GAMES, ownerOf };

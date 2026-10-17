@@ -1,4 +1,4 @@
-// Manche « Grand Duel » : deux joueurs face à face (premier à 3 points),
+﻿// Manche « Grand Duel » : deux joueurs face à face (premier à 3 points),
 // le public mise des points virtuels sur le vainqueur. Aucun argent réel.
 const animator = require('../animator');
 const { pickQuestions } = require('./quiz');
@@ -58,6 +58,8 @@ function end(room) {
       betResults.push({ id: pid, target: bet.target, stake: bet.stake, gain });
     }
     room.say(animator.duelWin(room.players.get(winnerId)?.name || '?'));
+    const loserId = winnerId === d.a ? d.b : d.a;
+    room.highlight('duel', d.bets.size, { emoji: '⚔️', title: 'Le Grand Duel', body: `${room.players.get(winnerId)?.name} bat ${room.players.get(loserId)?.name} ${Math.max(d.scoreA, d.scoreB)} à ${Math.min(d.scoreA, d.scoreB)} !`, players: [winnerId, loserId] });
   } else {
     for (const [pid, bet] of d.bets) betResults.push({ id: pid, target: bet.target, stake: bet.stake, gain: 0 });
     room.say(animator.duelDraw());

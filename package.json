@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "showtime",
   "version": "0.1.0",
   "description": "SHOWTIME – Ce soir, c'est vous les stars ! Jeu télévisé interactif dans le navigateur.",
@@ -8,17 +8,20 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "bots": "node scripts/bots.js",
-    "test": "node scripts/e2e.js"
+    "test": "node scripts/e2e.js && node scripts/api-test.js && node scripts/pg-test.js",
+    "test:api": "node scripts/api-test.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "express": "^4.21.2",
+    "pg": "^8.23.1",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
+    "pg-mem": "^3.0.14",
     "socket.io-client": "^4.8.1"
   }
 }

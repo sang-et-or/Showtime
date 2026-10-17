@@ -4,6 +4,9 @@
 const socket = io({ transports: ['websocket', 'polling'] });
 const STORE = 'showtime-host';
 let params = new URLSearchParams(location.search);
+// Mode « mini-écran » : la page télé affichée en lecture seule dans le téléphone d'un joueur à distance.
+const SPECTATE = params.get('spectate') === '1';
+if (SPECTATE) document.body.classList.add('mini');
 let state = null;
 let viewKey = null;
 let view = null; // { update(state) } de la vue courante
@@ -24,13 +27,14 @@ const saveHost = (code, token) => { try { localStorage.setItem(STORE, JSON.strin
 // ---------------------------------------------------------------------------
 socket.on('connect', () => {
   $('.offline-banner')?.remove();
+  if (SPECTATE) { spectate(); return; }
   const saved = loadHost();
   const room = params.get('room');
   if (room) {
     if (!saved || saved.code !== room) return expired();
     socket.emit('host:resume', { code: saved.code, hostToken: saved.token }, (res) => { if (res.error) expired(); else ready(); });
   } else if (params.get('new')) {
-    socket.emit('host:create', { mode: params.get('new') === 'remote' ? 'remote' : 'local', format: params.get('format'), game: params.get('game') }, (res) => {
+    socket.emit('host:create', { mode: params.get('new') === 'remote' ? 'remote' : 'local', format: params.get('format'), game: params.get('game'), themes: params.get('themes') || undefined }, (res) => {
       if (res.error) { toast(res.error, 6000); return; }
       saveHost(res.code, res.hostToken);
       history.replaceState(null, '', `/host?room=${res.code}`);
@@ -47,6 +51,50 @@ socket.on('disconnect', () => {
 });
 
 socket.on('state', (s) => render(s));
+
+// 📸 Une photo vient d'être prise : on l'affiche quelques secondes façon polaroïd.
+const photoQueue = [];
+let photoShowing = false;
+socket.on('photo', (p) => { photoQueue.push(p); if (!photoShowing) nextPhoto(); });
+function photoAuth() {
+  if (SPECTATE) {
+    const ident = JSON.parse(localStorage.getItem('showtime-player') || '{}');
+    return { 'x-room': ident.code, 'x-player-id': ident.playerId, 'x-player-token': ident.token };
+  }
+  const saved = loadHost();
+  return { 'x-room': saved.code, 'x-host-token': saved.token };
+}
+
+async function nextPhoto() {
+  const p = photoQueue.shift();
+  if (!p) { photoShowing = false; return; }
+  photoShowing = true;
+  const auth = photoAuth();
+  try {
+    const res = await fetch(`/api/photos/${p.id}`, { headers: auth });
+    if (!res.ok) throw new Error();
+    const url = URL.createObjectURL(await res.blob());
+    SFX.pop();
+    const pola = h('div', { class: 'polaroid' }, h('img', { src: url, alt: `Photo de ${p.by.name}` }), h('b', { text: `📸 ${p.by.avatar} ${p.by.name}` }),
+      h('button', { class: 'pola-del', title: 'Retirer cette photo', onclick: async () => {
+        await fetch(`/api/photos/${p.id}`, { method: 'DELETE', headers: { 'x-showtime': '1', ...auth } });
+        pola.remove(); toast('Photo retirée');
+      } }, '🗑️'));
+    document.body.append(pola);
+    setTimeout(() => { pola.classList.add('out'); setTimeout(() => { pola.remove(); URL.revokeObjectURL(url); nextPhoto(); }, 600); }, 6000);
+  } catch { nextPhoto(); }
+}
+
+/** Lecture seule : on s'identifie avec les identifiants du joueur enregistrés sur ce téléphone. */
+function spectate() {
+  $('#curtain').classList.add('hidden');
+  let ident = null;
+  try { ident = JSON.parse(localStorage.getItem('showtime-player')); } catch { /* */ }
+  if (!ident) return;
+  socket.emit('spectator:watch', ident, (res) => {
+    if (res.error) $('#view').replaceChildren(h('div', { class: 'round-intro' }, h('p', { text: 'Écran indisponible : rejoins d’abord la partie.' })));
+  });
+}
 
 function ready() {
   const b = $('#open-curtain');
@@ -116,6 +164,16 @@ $('#btn-fs').addEventListener('click', () => {
   else document.documentElement.requestFullscreen?.().catch(() => {});
 });
 if (!Voice.supported) $('#btn-voice').hidden = true;
+if (SPECTATE) {
+  SFX.muted = true; Voice.enabled = false;
+  $('#btn-sound').setAttribute('aria-pressed', 'false');
+  $('#btn-sound').title = 'Activer le son et la voix de l’animateur';
+  $('#btn-sound').addEventListener('click', () => {
+    SFX.unlock();
+    curtainOpen = true;
+    Voice.enabled = !SFX.muted;
+  });
+}
 
 // ---------------------------------------------------------------------------
 // L'animateur
@@ -224,18 +282,22 @@ const VIEWS = {
     const settings = h('div', { class: 'settings panel' });
     const startBtn = h('button', { class: 'btn gold big', onclick: () => action('start') }, 'Lever le rideau ! ✨');
     const hint = h('div', { class: 'hint' });
-    root.append(h('div', { class: 'lobby' }, joinCard, h('div', { class: 'lobby-right' }, cast, settings, h('div', { class: 'start-row' }, startBtn, hint))));
+    const readyBox = h('div', { class: 'ready-box' });
+    const autoBanner = h('div', { class: 'auto-banner hidden' });
+    root.append(h('div', { class: 'lobby' }, joinCard, h('div', { class: 'lobby-right' }, cast, settings, autoBanner, h('div', { class: 'start-row' }, startBtn, h('div', { class: 'start-info' }, readyBox, hint)))));
+    let autoTick = null;
 
     const chip = (label, on, onclick) => h('button', { class: `chip${on ? ' on' : ''}`, 'aria-pressed': String(on), onclick }, label);
     const send = (patch) => action('settings', { settings: { ...state.settings, ...patch } });
 
     return {
-      update(st) {
+      update(st, prev) {
         castTitle.textContent = `⭐ Les stars de ce soir (${st.players.length}/12)`;
         if (!st.players.length) castGrid.replaceChildren(h('div', { class: 'empty-cast', text: 'En attente des premières stars… Scannez le QR code !' }));
         else {
           castGrid.replaceChildren(...st.players.map((p) => h('div', { class: 'cast-item' },
             avatarEl(p, p.connected ? '' : 'off'),
+            st.ready.includes(p.id) ? h('span', { class: 'ready-badge pop', title: 'Prêt', text: '✅' }) : '',
             h('div', { class: 'name', text: p.name }),
             h('button', { class: 'kick', title: `Retirer ${p.name}`, 'aria-label': `Retirer ${p.name}`, onclick: () => { if (confirm(`Retirer ${p.name} du plateau ?`)) action('kick', { playerId: p.id }); } }, '✕'))));
         }
@@ -243,9 +305,9 @@ const VIEWS = {
         const se = st.settings;
         const cat = st.catalog;
         const online = st.players.filter((p) => p.connected).length;
-        const allGames = [...cat.quick, ...cat.board];
+        const allGames = [...cat.quick, ...cat.board, ...cat.cards];
         const game = allGames.find((g) => g.id === se.game) || allGames[0];
-        const usesQuiz = se.format === 'show' && (se.rounds.quiz || se.rounds.duel);
+        const usesQuiz = se.format === 'show' ? (se.rounds.quiz || se.rounds.duel) : se.game === 'quiz';
         const changeBtn = h('button', { class: 'btn ghost', onclick: () => openPicker(st) }, '🔄 Changer de jeu');
 
         // Grande carte « programme choisi », lisible de loin.
@@ -257,25 +319,35 @@ const VIEWS = {
             changeBtn)
           : h('div', { class: 'prog-hero' },
             h('span', { class: 'prog-ic', text: game.icon }),
-            h('div', { class: 'prog-txt' }, h('small', { text: cat.board.some((g) => g.id === game.id) ? 'Jeu de plateau' : 'Partie rapide' }), h('b', { text: game.title }),
+            h('div', { class: 'prog-txt' }, h('small', { text: cat.board.some((g) => g.id === game.id) ? 'Jeu de plateau' : cat.cards.some((g) => g.id === game.id) ? 'Jeu de cartes' : 'Partie rapide' }), h('b', { text: game.title }),
               h('span', { text: game.rules }),
               h('em', { class: online < game.min ? 'warn' : '', text: `👥 ${game.players} · ⏱ ${game.duration}` })),
             changeBtn);
 
+        // 🗳️ Vote des joueurs : on affiche le décompte en direct à la place du jeu choisi.
+        const voteHero = se.vote ? h('div', { class: 'prog-hero vote-hero' },
+          h('span', { class: 'prog-ic', text: '🗳️' }),
+          h('div', { class: 'prog-txt' }, h('small', { text: 'Vote des joueurs' }),
+            h('b', { text: st.tally.length ? `${st.tally[0].icon} ${st.tally[0].title} en tête !` : 'Votez sur vos téléphones !' }),
+            h('span', { text: `${st.voters} / ${online} ont voté · le jeu le plus voté sera lancé (égalité : tirage au sort)` }),
+            h('div', { class: 'tally' }, ...st.tally.slice(0, 6).map((t) => h('div', { class: 'tally-row' },
+              h('span', { text: `${t.icon} ${t.title}` }), h('i', { style: `width:${Math.round((t.n / Math.max(1, st.voters)) * 100)}%` }), h('b', { text: String(t.n) })))))) : null;
         settings.replaceChildren(
-          hero,
-          se.format === 'show'
+          voteHero || hero,
+          se.format === 'show' && !se.vote
             ? h('div', { class: 'row' }, ...cat.show.map((r) => chip(`${r.icon} ${r.title}`, se.rounds[r.id], () => send({ rounds: { ...se.rounds, [r.id]: !se.rounds[r.id] } }))))
             : '',
-          usesQuiz ? h('div', { class: 'row' }, h('span', { text: 'Thèmes du quiz' }),
-            ...Object.entries(st.categories).map(([k, c]) => chip(`${c.icon} ${c.label}`, se.categories.includes(k), () => {
-              const cats = se.categories.includes(k) ? se.categories.filter((x) => x !== k) : [...se.categories, k];
-              if (cats.length) send({ categories: cats });
-            }))) : '',
+          usesQuiz ? themePicker(st, chip, send) : '',
           h('div', { class: 'row' }, h('span', { text: 'Durée' }),
             chip('Courte', se.length === 'short', () => send({ length: 'short' })),
             chip('Normale', se.length === 'normal', () => send({ length: 'normal' })),
             chip('Longue', se.length === 'long', () => send({ length: 'long' }))),
+          h('div', { class: 'row' }, h('span', { text: 'Choix du jeu' }),
+            chip('🗳️ Vote des joueurs', se.vote, () => send({ vote: true })),
+            chip('🎛️ Je choisis', !se.vote, () => send({ vote: false }))),
+          h('div', { class: 'row' }, h('span', { text: 'Photos' }),
+            chip('📸 Autorisées', se.photos, () => send({ photos: true })),
+            chip('🚫 Désactivées', !se.photos, () => send({ photos: false }))),
           h('div', { class: 'row' }, h('span', { text: 'Joueurs' }),
             chip('🛋️ Même pièce', se.mode === 'local', () => send({ mode: 'local' })),
             chip('🌍 À distance', se.mode === 'remote', () => send({ mode: 'remote' }))),
@@ -288,6 +360,25 @@ const VIEWS = {
             : online < 3 ? 'Astuce : c’est plus drôle à partir de 3 joueurs !' : 'Tout le monde est là ? C’est parti !';
         if (online < needed) startBtn.disabled = true;
 
+        // « Je suis prêt » : compteur, relance des retardataires, compte à rebours automatique.
+        const readyIds = new Set(st.ready);
+        const readyOnline = st.players.filter((p) => p.connected && readyIds.has(p.id)).length;
+        if (prev && prev.ready && st.ready.length > prev.ready.length) SFX.blip();
+        readyBox.replaceChildren(
+          online ? h('b', { class: readyOnline === online ? 'all' : '', text: `✅ ${readyOnline}/${online} prêt${readyOnline > 1 ? 's' : ''}` }) : '',
+          online && readyOnline < online && !st.autoStart ? h('button', { class: 'chip', onclick: () => action('nudge') }, '📣 Qui est prêt ?') : '');
+        autoBanner.classList.toggle('hidden', !st.autoStart);
+        clearInterval(autoTick);
+        if (st.autoStart) {
+          const end = Date.now() + st.remainingMs;
+          const paint = () => {
+            const sec = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+            autoBanner.replaceChildren(h('span', { text: '🚀 Tout le monde est prêt ! Le show commence dans' }), h('b', { class: 'pop', text: String(sec) }),
+              h('button', { class: 'chip', onclick: () => action('cancelStart') }, '✋ Attendre'));
+          };
+          paint();
+          autoTick = setInterval(paint, 250);
+        }
         if (st.settings.mode === 'remote') {
           remoteTip.classList.remove('hidden');
           const local = joinInfo && /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(joinInfo.base || '');
@@ -465,10 +556,11 @@ const VIEWS = {
     };
     const s1 = step(r[0], 'p1'); const s2 = step(r[1], 'p2'); const s3 = step(r[2], 'p3');
     const rest = h('div', { class: 'final-rest' }, ...r.slice(3).map((p) => h('div', { class: 'gain' }, avatarEl(p, 'sm'), h('span', { text: `${p.rank}. ${p.name}` }), h('b', { style: 'color:var(--gold)', text: fmt(p.score) }))));
+    const note = h('p', { class: 'final-note', text: '📚 Les joueurs connectés retrouvent cette soirée, ses souvenirs et ses photos dans « Mon compte ».' });
     const actions = h('div', { class: 'final-actions' },
       h('button', { class: 'btn gold big', onclick: () => action('restart') }, 'Rejouer avec la même équipe 🔁'),
       h('a', { class: 'btn ghost big', href: '/' }, 'Accueil'));
-    root.append(h('div', { class: 'final' }, cd, h('div', { class: 'podium' }, s2, s1, s3), rest, actions));
+    root.append(h('div', { class: 'final' }, cd, h('div', { class: 'podium' }, s2, s1, s3), rest, actions, note));
 
     SFX.drumroll(3);
     [3, 2, 1].forEach((n, i) => later(i * 1000, () => { cd.replaceChildren(h('span', { text: String(n) })); SFX.beep(false); }));
@@ -480,6 +572,35 @@ const VIEWS = {
   },
 };
 
+/** Thèmes du quiz, rangés par famille ; le thème adulte demande confirmation ; choix des clubs de L1. */
+function themePicker(st, chip, send) {
+  const se = st.settings;
+  const groups = {};
+  Object.entries(st.categories).forEach(([k, c]) => { (groups[c.group] = groups[c.group] || []).push([k, c]); });
+  const toggle = (k, c) => {
+    const on = se.categories.includes(k);
+    if (!on && c.adult && !confirm('🔞 Thème réservé aux adultes : questions coquines sur l’amour et la séduction (jamais vulgaires).\nTous les joueurs sont-ils majeurs et d’accord ?')) return;
+    const cats = on ? se.categories.filter((x) => x !== k) : [...se.categories, k];
+    if (cats.length) send({ categories: cats });
+  };
+  const box = h('div', { class: 'theme-box' },
+    h('div', { class: 'theme-head' }, h('b', { text: '🧠 Thèmes du quiz' }), h('small', { text: `${se.categories.length} choisi${se.categories.length > 1 ? 's' : ''}` })),
+    ...Object.entries(groups).map(([g, list]) => h('div', { class: 'row' }, h('span', { text: g }),
+      ...list.map(([k, c]) => {
+        const el = chip(`${c.icon} ${c.label}${c.adult ? ' 🔞' : ''}`, se.categories.includes(k), () => toggle(k, c));
+        if (c.adult) el.classList.add('adult');
+        return el;
+      }))));
+  if (se.categories.includes('clubs')) {
+    const clubs = se.clubs || [];
+    box.append(h('div', { class: 'row clubs-row' }, h('span', { text: 'Vos clubs' }),
+      chip('Tous', clubs.length === 0, () => send({ clubs: [] })),
+      ...Object.entries(st.clubs).map(([k, c]) => chip(`${c.icon} ${c.label}`, clubs.includes(k), () => {
+        send({ clubs: clubs.includes(k) ? clubs.filter((x) => x !== k) : [...clubs, k] });
+      }))));
+  }
+  return box;
+}
 /** Grand sélecteur de jeux en plein écran (salon). */
 function openPicker(st) {
   const cat = st.catalog;
@@ -495,7 +616,8 @@ function openPicker(st) {
         h('span', { class: 'show-ic', text: '🎬' }),
         h('span', { class: 'show-txt' }, h('b', { text: 'Le Grand Show' }), h('span', { text: 'Plusieurs manches et un podium final.' }))),
       h('h3', { class: 'family', text: '⚡ Parties rapides' }), h('div', { class: 'tile-grid' }, ...cat.quick.map(tile)),
-      h('h3', { class: 'family', text: '🎲 Jeux de plateau' }), h('div', { class: 'tile-grid' }, ...cat.board.map(tile))));
+      h('h3', { class: 'family', text: '🎲 Jeux de plateau' }), h('div', { class: 'tile-grid' }, ...cat.board.map(tile)),
+      h('h3', { class: 'family', text: '🃏 Jeux de cartes' }), h('div', { class: 'tile-grid' }, ...cat.cards.map(tile))));
   document.body.append(overlay);
 }
 function countUp(el, from, to, ms) {

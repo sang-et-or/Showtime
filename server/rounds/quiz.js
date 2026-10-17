@@ -1,4 +1,4 @@
-// Manche « Le Grand Quiz » : 4 réponses, la rapidité rapporte des points.
+﻿// Manche « Le Grand Quiz » : 4 réponses, la rapidité rapporte des points.
 const animator = require('../animator');
 const { CATEGORIES, QUESTIONS } = require('../content/questions');
 const { shuffle } = require('../util');
@@ -12,9 +12,19 @@ const COUNT = { short: 5, normal: 8, long: 12 };
 function pickQuestions(room, n) {
   const used = room.ctx.usedQuestions;
   const cats = room.settings.categories;
-  let pool = QUESTIONS.filter((q) => cats.includes(q.cat) && !used.has(q.q));
-  if (pool.length < n) pool = QUESTIONS.filter((q) => !used.has(q.q));
-  if (pool.length < n) { used.clear(); pool = QUESTIONS; }
+  const clubs = room.settings.clubs || [];
+  // Thèmes choisis (et clubs choisis pour « Clubs de L1 ») ; le thème adulte n'est jamais ajouté en complément.
+  const chosen = (q) => cats.includes(q.cat) && (q.cat !== 'clubs' || !clubs.length || clubs.includes(q.club));
+  const allowed = (q) => !CATEGORIES[q.cat].adult || cats.includes(q.cat);
+  let pool = QUESTIONS.filter((q) => chosen(q) && !used.has(q.q));
+  if (pool.length < n) {
+    // Complément : d'abord des thèmes de la même famille (ex. Lens seul → autres clubs, foot), puis le reste.
+    const groups = new Set(cats.map((c) => CATEGORIES[c].group));
+    const extra = shuffle(QUESTIONS.filter((q) => !chosen(q) && allowed(q) && !used.has(q.q)))
+      .sort((a, b) => Number(groups.has(CATEGORIES[b.cat].group)) - Number(groups.has(CATEGORIES[a.cat].group)));
+    pool = [...pool, ...extra.slice(0, n - pool.length)];
+  }
+  if (pool.length < n) { used.clear(); pool = QUESTIONS.filter(allowed); }
   pool = shuffle(pool);
   const byCat = new Map();
   for (const q of pool) { if (!byCat.has(q.cat)) byCat.set(q.cat, []); byCat.get(q.cat).push(q); }
@@ -64,6 +74,7 @@ function reveal(room) {
   if (winners.length === 0) room.say(animator.allWrong());
   else if (winners.length === results.length && results.length > 1) room.say(animator.allRight());
   else room.say(animator.fastest(room.players.get(winners[0].id).name));
+  if (winners[0]) room.highlight('quiz_fast', -winners[0].ms, { emoji: '⚡', title: 'Le buzzer le plus rapide', body: `${room.players.get(winners[0].id)?.name} trouve « ${d.choices[d.correct]} » en ${(winners[0].ms / 1000).toFixed(1).replace('.', ',')} s à la question : « ${d.text} »`, players: [winners[0].id] });
 
   const counts = [0, 0, 0, 0];
   for (const a of d.answers.values()) counts[a.choice]++;
@@ -81,7 +92,10 @@ module.exports = {
   title: 'Le Grand Quiz',
   icon: '🧠',
   subtitle: 'Bonne réponse = points. Réponse rapide = encore plus de points !',
-  pitch: 'Culture, musique, cinéma, sport : 4 réponses, le plus rapide gagne.',
+  pitch: 'Années 80, foot, clubs de L1, séries, coquin 🔞… Choisissez vos thèmes !',
+  rules: 'Une question, quatre réponses : répondez sur votre téléphone. Plus vous êtes rapides, plus vous marquez, et les séries de bonnes réponses rapportent un bonus. Choisissez les thèmes juste en dessous.',
+  players: '1 à 12 joueurs',
+  duration: '5 à 15 min',
   phases: ['quizQuestion', 'quizReveal'],
   pickQuestions,
 

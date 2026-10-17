@@ -1,4 +1,4 @@
-// Manche « Défi Surprise » : chacun son tour, un mime secret à faire deviner
+﻿// Manche « Défi Surprise » : chacun son tour, un mime secret à faire deviner
 // ou une petite performance notée par le public.
 const animator = require('../animator');
 const { MIMES, DEFIS } = require('../content/defis');
@@ -79,6 +79,7 @@ function reveal(room, finderId) {
     res.avg = stars.length ? Math.round((stars.reduce((a, b) => a + b, 0) / stars.length) * 10) / 10 : 0;
     res.perfGain = Math.round(res.avg * 150);
     room.addScore(d.pid, res.perfGain);
+    if (stars.length) room.highlight('perf', res.avg, { emoji: '🎤', title: 'La performance de la soirée', body: `${perf?.name} : « ${d.item} » → ${String(res.avg).replace('.', ',')} / 5`, players: [d.pid] });
     room.say(stars.length ? animator.defiScore(perf?.name || '?', String(res.avg).replace('.', ',')) : 'Personne n’a voté… Le public s’est endormi ?');
   }
   room.enter('defiReveal', { ...d, ...res });

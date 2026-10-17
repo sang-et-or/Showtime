@@ -8,13 +8,17 @@
 // ses propres phases : le salon lui transmet les actions des joueurs et lui demande quoi afficher.
 
 const animator = require('./animator');
-const { CATEGORIES } = require('./content/questions');
-const { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, ownerOf } = require('./rounds');
+const { CATEGORIES, DEFAULT_CATEGORIES, CLUBS } = require('./content/questions');
+const { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, CARD_GAMES, ownerOf } = require('./rounds');
 const { token, shortId } = require('./util');
+const { installMemories } = require('./memories');
 
+const crypto = require('crypto');
 const MAX_PLAYERS = 12;
 const LENGTHS = ['short', 'normal', 'long'];
 const DURATIONS = { roundIntro: 7_000, leaderboard: 7_000, podium: 7_000 };
+const AUTOSTART_MS = 10_000;
+const ALL_GAMES = [...QUICK_GAMES, ...BOARD_GAMES, ...CARD_GAMES]; // compte à rebours quand tout le monde est prêt
 const COLORS = ['#ff3d8b', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c', '#f87171', '#34d399', '#60a5fa', '#f472b6', '#fde047', '#2dd4bf'];
 
 class Room {
@@ -24,6 +28,7 @@ class Room {
     this.send = send;
     this.hostToken = token();
     this.hostSocket = null;
+    this.spectators = new Set(); // téléphones qui affichent l'écran télé
     this.players = new Map();
     this.settings = {
       mode: 'local', // 'local' (même pièce) | 'remote' (à distance)
@@ -31,7 +36,10 @@ class Room {
       rounds: Object.fromEntries(SHOW_ROUNDS.map((id) => [id, true])),
       game: QUICK_GAMES[0],
       length: 'normal',
-      categories: Object.keys(CATEGORIES),
+      categories: [...DEFAULT_CATEGORIES],
+      clubs: [], // vide = tous les clubs
+      photos: true, // les joueurs peuvent prendre des photos souvenirs
+      vote: false, // les joueurs votent pour le jeu (activé d'office à distance)
     };
     this.phase = 'lobby';
     this.data = {};
@@ -123,8 +131,10 @@ class Room {
 
   current() { return ownerOf(this.phase); }
 
+  gameTitle(id) { const m = ROUNDS[id]; return m && !m.prep ? m.title : null; }
+
   // ---------- joueurs ----------
-  addPlayer(name, avatar, socketId) {
+  addPlayer(name, avatar, socketId, userId = null) {
     if (this.players.size >= MAX_PLAYERS) return { error: 'Le plateau est complet (12 joueurs max).' };
     const lower = name.toLowerCase();
     if ([...this.players.values()].some((p) => p.name.toLowerCase() === lower)) {
@@ -134,12 +144,13 @@ class Room {
     const color = COLORS.find((c) => !used.has(c)) || COLORS[this.players.size % COLORS.length];
     const p = {
       id: shortId(), token: token(), name, avatar, color, score: 0, streak: 0,
-      socketId, connected: true, joinedAt: Date.now(), disconnectedAt: 0,
+      socketId, connected: true, joinedAt: Date.now(), disconnectedAt: 0, ready: false, userId,
     };
     this.players.set(p.id, p);
     if (this.phase === 'lobby') this.say(animator.playerJoined(name));
     const mod = this.current();
     if (mod && mod.onJoin) mod.onJoin(this, p);
+    this.checkReady(); // un nouvel arrivant pas encore prêt suspend le lancement automatique
     this.touch();
     this.sync();
     return { player: p };
@@ -152,11 +163,22 @@ class Room {
     p.connected = true;
     p.disconnectedAt = 0;
     this.touch();
+    this.checkReady();
     this.sync();
     return p;
   }
 
+  /** Un joueur affiche l'écran télé sur son téléphone (mode à distance). */
+  addSpectator(socketId, pid, tok) {
+    const p = this.players.get(pid);
+    if (!p || p.token !== tok) return false;
+    this.spectators.add(socketId);
+    this.sync();
+    return true;
+  }
+
   disconnectSocket(socketId) {
+    this.spectators.delete(socketId);
     if (this.hostSocket === socketId) this.hostSocket = null;
     for (const p of this.players.values()) {
       if (p.socketId === socketId) {
@@ -189,6 +211,11 @@ class Room {
 
   /** Action d'un joueur : transmise au jeu en cours. */
   act(p, msg) {
+    if (this.phase === 'lobby') {
+      if (msg.type === 'ready') { p.ready = !!msg.on; this.touch(); this.checkReady(); this.sync(); }
+      if (msg.type === 'voteGame' && this.settings.vote && (msg.game === 'show' || ALL_GAMES.includes(msg.game))) { p.vote = msg.game; this.touch(); this.sync(); }
+      return;
+    }
     const mod = this.current();
     if (!mod || !mod.act || typeof msg.type !== 'string') return;
     this.touch();
@@ -197,17 +224,84 @@ class Room {
 
   /** Demande au jeu en cours si tout le monde a fini (après une déconnexion par exemple). */
   check() {
+    if (this.phase === 'lobby') { this.checkReady(); return; }
     const mod = this.current();
     if (mod && mod.check) mod.check(this);
+  }
+
+  // ---------- vote des joueurs pour le jeu ----------
+  /** Décompte des votes des joueurs connectés, du plus voté au moins voté. */
+  voteTally() {
+    const counts = new Map();
+    for (const p of this.connectedPlayers()) if (p.vote) counts.set(p.vote, (counts.get(p.vote) || 0) + 1);
+    return [...counts.entries()].map(([id, n]) => ({ id, n, title: id === 'show' ? 'Le Grand Show' : ROUNDS[id].title, icon: id === 'show' ? '🎬' : ROUNDS[id].icon }))
+      .sort((a, b) => b.n - a.n);
+  }
+
+  /** Au lancement : le jeu le plus voté l'emporte (tirage au sort en cas d'égalité). */
+  applyVote() {
+    if (!this.settings.vote) return;
+    const tally = this.voteTally();
+    if (!tally.length) return;
+    const best = tally.filter((t) => t.n === tally[0].n);
+    const win = best[crypto.randomInt(best.length)];
+    if (win.id === 'show') this.settings.format = 'show';
+    else { this.settings.format = 'quick'; this.settings.game = win.id; }
+    this.voteNote = best.length > 1 ? `Égalité dans les votes ! Le tirage au sort désigne… ${win.title} !` : `Les joueurs ont voté : place à ${win.title} !`;
+  }
+
+  // ---------- « Je suis prêt » et lancement automatique ----------
+  /** Nombre minimum de joueurs pour le programme choisi. */
+  neededPlayers() {
+    const top = this.settings.vote ? this.voteTally()[0] : null;
+    if (top) return top.id === 'show' ? 1 : (ROUNDS[top.id].minPlayers || 1);
+    return this.settings.format === 'quick' ? (ROUNDS[this.settings.game].minPlayers || 1) : 1;
+  }
+
+  /** Quand tous les joueurs connectés sont prêts : compte à rebours puis lancement automatique. */
+  checkReady() {
+    if (this.phase !== 'lobby') return;
+    const c = this.connectedPlayers();
+    const all = c.length > 0 && c.length >= this.neededPlayers() && c.every((p) => p.ready);
+    if (all && !this.autoStart) {
+      this.autoStart = true;
+      this.say(animator.allReady(c.length));
+      this.setTimer(AUTOSTART_MS, () => { this.autoStart = false; this.start(); }, true);
+    } else if (!all && this.autoStart) {
+      this.autoStart = false;
+      this.clearTimer();
+      const late = c.filter((p) => !p.ready).map((p) => p.name);
+      this.say(late.length ? animator.readyWait(late.join(', ')) : 'On attend encore un peu…');
+    }
+  }
+
+  /** L'hôte relance les retardataires : leur téléphone vibre et sonne. */
+  nudge() {
+    if (this.phase !== 'lobby') return;
+    const late = this.connectedPlayers().filter((p) => !p.ready);
+    if (!late.length) return;
+    late.forEach((p) => this.send(p.socketId, 'nudge', {}));
+    this.say(animator.nudge(late.map((p) => p.name).join(', ')));
+    this.sync();
+  }
+
+  /** L'hôte arrête le compte à rebours : chacun devra se redéclarer prêt. */
+  cancelAutoStart() {
+    if (this.phase !== 'lobby' || !this.autoStart) return;
+    this.autoStart = false;
+    this.clearTimer();
+    for (const p of this.players.values()) p.ready = false;
+    this.say('Lancement annulé ! Prenez votre temps, et dites-moi quand vous êtes prêts.');
+    this.sync();
   }
 
   // ---------- réglages / démarrage ----------
   updateSettings(s) {
     if (this.phase !== 'lobby' || !s || typeof s !== 'object') return;
     const se = this.settings;
-    if (s.mode === 'local' || s.mode === 'remote') se.mode = s.mode;
+    if ((s.mode === 'local' || s.mode === 'remote') && s.mode !== se.mode) { se.mode = s.mode; se.vote = s.mode === 'remote'; }
     if (s.format === 'show' || s.format === 'quick') se.format = s.format;
-    if (QUICK_GAMES.includes(s.game) || BOARD_GAMES.includes(s.game)) se.game = s.game;
+    if (QUICK_GAMES.includes(s.game) || BOARD_GAMES.includes(s.game) || CARD_GAMES.includes(s.game)) se.game = s.game;
     if (LENGTHS.includes(s.length)) se.length = s.length;
     if (s.rounds && typeof s.rounds === 'object') {
       const next = { ...se.rounds };
@@ -218,6 +312,10 @@ class Room {
       const cats = s.categories.filter((c) => CATEGORIES[c]);
       if (cats.length) se.categories = [...new Set(cats)];
     }
+    if (Array.isArray(s.clubs)) se.clubs = [...new Set(s.clubs.filter((c) => CLUBS[c]))];
+    if (typeof s.photos === 'boolean') se.photos = s.photos;
+    if (typeof s.vote === 'boolean') se.vote = s.vote;
+    this.checkReady();
     this.sync();
   }
 
@@ -233,11 +331,14 @@ class Room {
   start() {
     if (this.phase !== 'lobby') return;
     if (this.connectedPlayers().length < 1) return;
-    for (const p of this.players.values()) { p.score = 0; p.streak = 0; }
+    this.autoStart = false;
+    this.applyVote();
+    for (const p of this.players.values()) { p.score = 0; p.streak = 0; p.ready = false; p.vote = null; }
     // Classement de départ : ordre d'arrivée (sinon tout le monde serait 1er ex aequo à 0 point).
     this.snapshot = new Map([...this.players.values()].map((p, i) => [p.id, { rank: i + 1, score: 0 }]));
     this.ctx = { usedQuestions: new Set() };
     this.program = this.buildProgram();
+    this.ensureSoiree(); // la soirée entre dans l'historique des joueurs connectés
     this.roundIndex = -1;
     this.manche = 0;
     this.touch();
@@ -262,7 +363,8 @@ class Room {
       this.say(`Oh non… ${why}`);
       this.setTimer(5_000, () => this.nextRound());
     } else {
-      this.say(mod.introLine(this));
+      this.say(this.voteNote ? `${this.voteNote} ${mod.introLine(this)}` : mod.introLine(this));
+      this.voteNote = null;
       this.setTimer(DURATIONS.roundIntro + (mod.introExtraMs || 0), () => mod.begin(this));
     }
     this.sync();
@@ -273,6 +375,7 @@ class Room {
     this.clearTimer();
     const remaining = this.program.slice(this.roundIndex + 1).some((id) => !ROUNDS[id].prep);
     const mod = ROUNDS[this.program[this.roundIndex]];
+    this.memorizeGame(mod);
     if (mod.prep || !remaining) { this.nextRound(); return; }
     this.goLeaderboard(`Après « ${mod.title} »`, () => this.nextRound());
   }
@@ -282,7 +385,7 @@ class Room {
     if (this.lineTimer) clearTimeout(this.lineTimer);
     for (const p of [...this.players.values()]) {
       if (!p.connected) this.players.delete(p.id);
-      else { p.score = 0; p.streak = 0; }
+      else { p.score = 0; p.streak = 0; p.ready = false; p.vote = null; }
     }
     this.enter('lobby');
     this.ctx = {};
@@ -314,6 +417,7 @@ class Room {
     this.clearTimer();
     const ranking = this.ranking();
     this.enter('final', { ranking });
+    this.memorizeFinal(ranking);
     this.say(animator.finalIntro());
     if (this.lineTimer) clearTimeout(this.lineTimer);
     if (ranking.length) {
@@ -339,10 +443,10 @@ class Room {
       role: 'host', code: this.code, phase: this.phase, key: this.phase, settings: this.settings, line: this.line, ...this.timing(),
       canSkip: !!this.pendingNext,
       players: [...this.players.values()].map((p) => ({ ...this.publicPlayer(p), score: p.score, connected: p.connected })),
-      categories: CATEGORIES,
+      categories: CATEGORIES, clubs: CLUBS,
     };
     switch (this.phase) {
-      case 'lobby': return { ...base, catalog: catalog() };
+      case 'lobby': return { ...base, catalog: catalog(), ready: [...this.players.values()].filter((p) => p.ready).map((p) => p.id), autoStart: !!this.autoStart, needed: this.neededPlayers(), tally: this.voteTally(), voters: this.connectedPlayers().filter((p) => p.vote).length };
       case 'roundIntro': return { ...base, key: `roundIntro:${this.roundIndex}`, round: d };
       case 'leaderboard': return { ...base, key: `leaderboard:${d.title}`, title: d.title, ranking: d.ranking };
       case 'final': return { ...base, ranking: d.ranking };
@@ -361,9 +465,18 @@ class Room {
       me: { ...this.publicPlayer(p), score: p.score, rank: rank ? rank.rank : null },
       playerCount: this.players.size,
       line: this.settings.mode === 'remote' ? this.line : null,
+      photos: this.settings.photos, account: !!p.userId,
     };
     switch (this.phase) {
-      case 'lobby': return { ...base, players: [...this.players.values()].map((x) => this.publicPlayer(x)) };
+      case 'lobby': {
+        const c = this.connectedPlayers();
+        const readyCount = c.filter((x) => x.ready).length;
+        return {
+          ...base, players: [...this.players.values()].map((x) => ({ ...this.publicPlayer(x), ready: x.ready })),
+          ready: p.ready, readyCount, total: c.length, othersWaiting: readyCount > 0 && !p.ready, autoStart: !!this.autoStart,
+          vote: this.settings.vote ? { mine: p.vote || null, tally: this.voteTally(), options: voteOptions(), online: c.length } : null,
+        };
+      }
       case 'roundIntro': return { ...base, key: `roundIntro:${this.roundIndex}`, round: d };
       case 'leaderboard': return { ...base, key: `leaderboard:${d.title}`, title: d.title, ranking: d.ranking };
       case 'final': return { ...base, ranking: d.ranking };
@@ -375,7 +488,12 @@ class Room {
   }
 
   sync() {
-    if (this.hostSocket) this.send(this.hostSocket, 'state', this.hostView());
+    // l'écran télé est envoyé à l'hôte… et aux joueurs à distance qui l'affichent sur leur téléphone
+    if (this.hostSocket || this.spectators.size) {
+      const view = this.hostView();
+      if (this.hostSocket) this.send(this.hostSocket, 'state', view);
+      for (const sid of this.spectators) this.send(sid, 'state', { ...view, spectator: true });
+    }
     for (const p of this.players.values()) {
       if (p.connected && p.socketId) this.send(p.socketId, 'state', this.playerView(p));
     }
@@ -387,13 +505,21 @@ class Room {
   }
 }
 
+/** Jeux proposés au vote des joueurs. */
+function voteOptions() {
+  const info = (id) => ({ id, title: ROUNDS[id].title, icon: ROUNDS[id].icon, min: ROUNDS[id].minPlayers || 1 });
+  return [{ id: 'show', title: 'Le Grand Show', icon: '🎬', min: 1 }, ...QUICK_GAMES.map(info), ...BOARD_GAMES.map(info), ...CARD_GAMES.map(info)];
+}
+
 /** Ce que l'écran hôte propose dans le salon : manches du Grand Show et parties rapides. */
 function catalog() {
   const info = (id) => {
     const m = ROUNDS[id];
     return { id, title: m.title, icon: m.icon, pitch: m.pitch, rules: m.rules || m.subtitle, players: m.players || '', duration: m.duration || '', min: m.minPlayers || 1 };
   };
-  return { show: SHOW_ROUNDS.map(info), quick: QUICK_GAMES.map(info), board: BOARD_GAMES.map(info) };
+  return { show: SHOW_ROUNDS.map(info), quick: QUICK_GAMES.map(info), board: BOARD_GAMES.map(info), cards: CARD_GAMES.map(info), themes: CATEGORIES, clubs: CLUBS };
 }
+
+installMemories(Room);
 
 module.exports = { Room, MAX_PLAYERS, catalog };

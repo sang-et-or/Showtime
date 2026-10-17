@@ -1,4 +1,4 @@
-// Manche « Qui a osé dire ça ? » : on devine l'auteur de chaque réponse secrète.
+﻿// Manche « Qui a osé dire ça ? » : on devine l'auteur de chaque réponse secrète.
 const animator = require('../animator');
 const { shuffle } = require('../util');
 
@@ -51,6 +51,7 @@ function reveal(room) {
   const authorGain = fooled * 200;
   room.addScore(d.authorId, authorGain);
   room.say(animator.whoSaidReveal(author ? author.name : 'un mystère', found, fooled));
+  if (author && fooled > 0) room.highlight('bluff', fooled, { emoji: '🤫', title: 'Le bluff de la soirée', body: `« ${d.text} » (${d.prompt.replace(/ :$/, '')}) : ${author.name} a berné ${fooled} joueur${fooled > 1 ? 's' : ''} !`, players: [d.authorId] });
   room.enter('whoReveal', { ...d, results, authorGain, found, fooled });
   room.setTimer(REVEAL_MS, () => next(room));
   room.sync();

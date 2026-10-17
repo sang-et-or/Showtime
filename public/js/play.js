@@ -44,7 +44,85 @@ socket.on('kicked', () => {
     h('div', { class: 'big-emoji', text: '👋' }), h('h1', { text: 'Tu as quitté le plateau' }),
     h('button', { class: 'btn big', onclick: () => showJoin() }, 'Revenir dans la partie')));
 });
-socket.on('state', (s) => render(s));
+socket.on('state', (s) => { render(s); cameraButton(s); miniScreen(s); });
+
+// ---------------------------------------------------------------------------
+// 📺 Écran partagé : le plateau télé en direct en haut du téléphone (activé d'office à distance).
+// ---------------------------------------------------------------------------
+let screenPref = null;
+try { screenPref = localStorage.getItem('showtime-screen'); } catch { /* */ }
+function miniScreen(s) {
+  const want = screenPref ? screenPref === 'on' : s.mode === 'remote';
+  const setPref = (v) => { screenPref = v; try { localStorage.setItem('showtime-screen', v); } catch { /* */ } miniScreen(state); };
+  let wrap = $('#mini-wrap');
+  let show = $('#screen-show');
+  if (want && !wrap) {
+    wrap = h('div', { id: 'mini-wrap', class: 'mini-wrap' },
+      h('iframe', { src: `/host?room=${encodeURIComponent(s.code)}&spectate=1`, title: 'Écran du jeu en direct', allow: 'autoplay' }),
+      h('div', { class: 'mini-tools' },
+        h('button', { onclick: () => { wrap.classList.toggle('big'); document.body.classList.toggle('split-big'); } }, '⤢ Agrandir'),
+        h('button', { onclick: () => setPref('off') }, '✕ Masquer')));
+    document.body.prepend(wrap);
+    document.body.classList.add('split');
+  } else if (!want && wrap) {
+    wrap.remove();
+    document.body.classList.remove('split', 'split-big');
+  }
+  if (!want && !show) {
+    show = h('button', { id: 'screen-show', class: 'screen-toggle', onclick: () => setPref('on') }, '📺 Voir l’écran');
+    document.body.append(show);
+  } else if (want && show) show.remove();
+}
+
+// ---------------------------------------------------------------------------
+// 📸 Photos souvenirs : prises avec l'appareil du téléphone, réduites avant envoi.
+// ---------------------------------------------------------------------------
+let camInput = null;
+function cameraButton(s) {
+  let btn = $('#cam-btn');
+  if (!s.photos) { btn?.remove(); return; }
+  if (btn) return;
+  camInput = h('input', { type: 'file', accept: 'image/*', capture: 'environment', class: 'hidden' });
+  camInput.addEventListener('change', () => { if (camInput.files[0]) uploadPhoto(camInput.files[0]); camInput.value = ''; });
+  btn = h('button', { id: 'cam-btn', class: 'cam-btn', 'aria-label': 'Prendre une photo souvenir', onclick: () => {
+    let agreed = false;
+    try { agreed = localStorage.getItem('showtime-photo-ok') === '1'; } catch { /* */ }
+    if (!agreed) {
+      if (!confirm('📸 Photo souvenir\n\nElle s’affichera sur l’écran et sera gardée dans l’historique des joueurs de la soirée.\nDemande toujours l’accord des personnes photographiées !\n\nContinuer ?')) return;
+      try { localStorage.setItem('showtime-photo-ok', '1'); } catch { /* */ }
+    }
+    camInput.click();
+  } }, '📸');
+  document.body.append(btn, camInput);
+}
+
+/** Réduit l'image (1280 px max, JPEG) pour qu'elle soit légère, puis l'envoie au serveur. */
+async function uploadPhoto(file) {
+  const ident = read(STORE);
+  if (!ident) return;
+  toast('📸 Envoi de la photo…');
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => null);
+    const img = bitmap || await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = URL.createObjectURL(file); });
+    const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const canvas = h('canvas');
+    canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', 0.8));
+    const res = await fetch('/api/photos', { method: 'POST', body: blob, headers: { 'content-type': 'image/jpeg', 'x-showtime': '1', 'x-room': ident.code, 'x-player-id': ident.playerId, 'x-player-token': ident.token } });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || 'Envoi impossible');
+    SFX.pop(); buzz(60);
+    toast('✅ Photo envoyée sur l’écran !');
+  } catch (e) { toast(`❌ ${e.message}`, 4000); }
+}
+// L'hôte relance les retardataires : vibration, son et bouton qui clignote.
+socket.on('nudge', () => {
+  buzz([200, 100, 200, 100, 400]);
+  SFX.beep(true);
+  const b = $('.ready-btn');
+  if (b) { b.classList.remove('nudged'); void b.offsetWidth; b.classList.add('nudged'); }
+});
 
 function setView(el) {
   el.id = 'pview';
@@ -67,12 +145,22 @@ function showJoin(errorMsg) {
     onclick: (e) => { avatar = a; SFX.tap(); grid.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget))); },
   })));
   const submit = h('button', { class: 'btn gold big', type: 'submit' }, 'Entrer sur le plateau ✨');
+  const accountBox = h('div', { class: 'account-box' });
   const form = h('form', { class: 'pview', novalidate: true },
     h('div', { style: 'text-align:center' }, h('div', { class: 'logo', style: 'font-size:2.6rem', text: 'SHOWTIME' }), h('p', { text: 'Ce soir, c’est toi la star !' })),
     h('div', { class: `field${code.length === 4 ? ' hidden' : ''}` }, h('label', { for: 'f-code', text: 'Code du salon (affiché à l’écran)' }), codeInput),
     h('div', { class: 'field' }, h('label', { for: 'f-name', text: 'Ton prénom de star' }), nameInput),
     h('div', { class: 'field' }, h('label', { text: 'Ton avatar' }), grid),
-    err, submit);
+    err, submit, accountBox);
+  // Compte facultatif : si la personne est connectée, sa soirée ira dans son historique.
+  fetch('/api/auth/me').then((r) => r.json()).then(({ user }) => {
+    if (user) {
+      accountBox.replaceChildren(h('span', { text: `✅ Connecté·e : ${user.avatar} ${user.name} — cette soirée ira dans ton historique.` }));
+      if (!nameInput.value) nameInput.value = user.name;
+    } else {
+      accountBox.replaceChildren(h('a', { href: `/compte?mode=register&next=${encodeURIComponent(`/play?room=${code || codeInput.value}`)}`, text: '👤 Créer un compte (facultatif) pour garder l’historique et les photos' }));
+    }
+  }).catch(() => {});
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (joining) return;
@@ -138,13 +226,48 @@ const PVIEWS = {
   lobby(root, s) {
     center(root);
     const faces = h('div', { class: 'lobby-faces' });
-    root.append(avatarEl(s.me, 'lg'), h('h1', { text: `Bienvenue, ${s.me.name} !` }),
-      h('p', { text: 'Tu es sur le plateau. Garde les yeux sur le grand écran : le show va bientôt commencer !' }),
-      faces,
+    const count = h('p', { class: 'ready-count' });
+    const nudge = h('div', { class: 'nudge-msg hidden', text: '👀 Les autres sont prêts… et toi ?' });
+    const auto = h('div', { class: 'auto-phone hidden' });
+    const btn = h('button', { class: 'ready-btn', onclick: () => { const on = !state.ready; act({ type: 'ready', on }); SFX.tap(); buzz(on ? [60, 40, 60] : 40); paintBtn(on); } });
+    function paintBtn(on) {
+      btn.classList.toggle('on', on);
+      btn.replaceChildren(h('span', { text: on ? '✅' : '✋' }), h('b', { text: on ? 'Prêt·e !' : 'Je suis prêt·e !' }), h('small', { text: on ? 'Touche pour annuler' : 'Touche quand tu es prêt·e' }));
+    }
+    const voteBox = h('div', { class: 'vote-box' });
+    root.append(avatarEl(s.me, 'lg'), h('h1', { text: `Bienvenue, ${s.me.name} !` }), btn, nudge, count, auto, voteBox, faces,
       h('button', { class: 'leave', onclick: () => { if (confirm('Quitter la partie ?')) { socket.emit('player:leave'); localStorage.removeItem(STORE); } } }, 'Quitter la partie'));
-    return { update(st) { faces.replaceChildren(...st.players.map((p) => avatarEl(p, 'sm'))); } };
+    let autoTick = null;
+    return {
+      update(st) {
+        paintBtn(st.ready);
+        count.textContent = st.total ? `${st.readyCount}/${st.total} joueur${st.total > 1 ? 's' : ''} prêt${st.readyCount > 1 ? 's' : ''}` : '';
+        nudge.classList.toggle('hidden', !st.othersWaiting || st.autoStart);
+        faces.replaceChildren(...st.players.map((p) => { const a = avatarEl(p, 'sm'); if (!p.ready) a.classList.add('wait'); return a; }));
+        // 🗳️ Vote pour le jeu : chacun choisit, le plus voté est lancé.
+        if (!st.vote) voteBox.replaceChildren();
+        else {
+          const counts = new Map(st.vote.tally.map((t) => [t.id, t.n]));
+          voteBox.replaceChildren(h('h2', { text: st.vote.mine ? '🗳️ Ton vote (tu peux changer)' : '🗳️ Vote pour le jeu !' }),
+            h('div', { class: 'vote-grid' }, ...st.vote.options.map((o) => {
+              const ok = st.vote.online >= o.min;
+              return h('button', {
+                class: `vote-opt${st.vote.mine === o.id ? ' on' : ''}`, disabled: !ok, title: ok ? o.title : `${o.min} joueurs minimum`,
+                onclick: () => { act({ type: 'voteGame', game: o.id }); SFX.tap(); buzz(30); },
+              }, h('span', { text: o.icon }), h('b', { text: o.title }), counts.get(o.id) ? h('em', { text: `${counts.get(o.id)} 🗳️` }) : '');
+            })));
+        }
+        auto.classList.toggle('hidden', !st.autoStart);
+        clearInterval(autoTick);
+        if (st.autoStart) {
+          const end = Date.now() + st.remainingMs;
+          const paint = () => { auto.textContent = `🚀 Ça commence dans ${Math.max(0, Math.ceil((end - Date.now()) / 1000))} s !`; };
+          paint();
+          autoTick = setInterval(paint, 250);
+        }
+      },
+    };
   },
-
   writing(root, s) {
     if (s.submitted) {
       center(root).append(h('div', { class: 'big-emoji', text: '🤫' }), h('h1', { text: 'Top secret !' }),
@@ -295,7 +418,9 @@ const PVIEWS = {
         h('h1', { text: rank === 1 ? 'Tu es LA star de la soirée !' : `Tu termines ${rank}e !` }),
         h('div', { class: 'points', text: `${fmt(me ? me.score : 0)} pts` }),
         miniBoard(s.ranking, s.me.id, 12),
-        h('p', { text: 'Merci d’avoir joué ! L’hôte peut relancer une partie avec la même équipe.' }));
+        h('p', { text: 'Merci d’avoir joué ! L’hôte peut relancer une partie avec la même équipe.' }),
+        s.account ? h('a', { class: 'btn ghost', href: '/compte' }, '📚 Voir cette soirée dans mon historique')
+          : h('a', { class: 'btn ghost', href: '/compte?mode=register&claim=1' }, '💾 Garder cette soirée : créer mon compte'));
     }, 6600);
   },
 };

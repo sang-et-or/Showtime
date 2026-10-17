@@ -10,13 +10,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3">
+  <link rel="stylesheet" href="/css/style.css?v=9">
 </head>
 <body>
   <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
   <div class="floor" aria-hidden="true"></div>
 
   <main class="home2">
+    <a class="account-link" href="/compte">👤 Mon compte · historique</a>
     <header class="home-hero">
       <h1 class="logo">SHOWTIME</h1>
       <p class="tagline">Ce soir, <em>c'est vous les stars !</em></p>
@@ -49,11 +50,17 @@
         <span class="btn gold big">Lancer le show</span>
       </a>
 
+      <h3 class="family">🧠 Quiz à thèmes <small>choisissez votre thème, le plus rapide gagne</small></h3>
+      <div class="theme-grid" id="theme-grid"></div>
+
       <h3 class="family">⚡ Parties rapides <small>un seul jeu, 5 à 15 minutes</small></h3>
       <div class="tile-grid" id="quick-grid"></div>
 
       <h3 class="family">🎲 Jeux de plateau <small>dés, pions et coups bas</small></h3>
       <div class="tile-grid" id="board-grid"></div>
+
+      <h3 class="family">🃏 Jeux de cartes <small>vos cartes restent cachées sur votre téléphone</small></h3>
+      <div class="tile-grid" id="cards-grid"></div>
     </section>
 
     <section class="how">
@@ -74,6 +81,7 @@
       mode = b.dataset.mode;
       showCard.href = link('format=show');
       document.querySelectorAll('.tile').forEach((t) => { t.href = link(`format=quick&game=${t.dataset.game}`); });
+      document.querySelectorAll('.theme-tile').forEach((t) => { t.href = link(`format=quick&game=quiz&themes=${t.dataset.themes}`); });
     }));
 
     function tile(g) {
@@ -92,6 +100,25 @@
     fetch('/api/catalog').then((r) => r.json()).then((c) => {
       document.getElementById('quick-grid').append(...c.quick.map(tile));
       document.getElementById('board-grid').append(...c.board.map(tile));
+      document.getElementById('cards-grid').append(...c.cards.map(tile));
+      // Une carte par thème de quiz, plus un « mélange » tout public.
+      const themeTile = (keys, icon, label, adult) => {
+        const a = document.createElement('a');
+        a.className = `theme-tile${adult ? ' adult' : ''}`;
+        a.dataset.themes = keys;
+        a.href = link(`format=quick&game=quiz&themes=${keys}`);
+        const i = document.createElement('span'); i.textContent = icon;
+        const b = document.createElement('b'); b.textContent = label;
+        a.append(i, b);
+        if (adult) {
+          const s = document.createElement('small'); s.textContent = '🔞 Adultes'; a.append(s);
+          a.addEventListener('click', (e) => { if (!confirm('🔞 Quiz coquin réservé aux adultes (jamais vulgaire). Tous les joueurs sont-ils majeurs ?')) e.preventDefault(); });
+        }
+        return a;
+      };
+      const tiles = [themeTile('culture,musique,cinema,sport,foot', '🎲', 'Le grand mélange')];
+      Object.entries(c.themes).forEach(([k, t]) => tiles.push(themeTile(k, t.icon, t.label, t.adult)));
+      document.getElementById('theme-grid').append(...tiles);
     });
 
     const code = document.getElementById('code');

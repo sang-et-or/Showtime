@@ -35,7 +35,10 @@ function reveal(room) {
     r.gained = r.diff === 0 ? EXACT : (PODIUM[rank - 1] || 0);
     room.addScore(r.id, r.gained);
   });
-  if (rows.length && rows[0].diff === 0) room.say(animator.estExact(room.players.get(rows[0].id).name));
+  if (rows.length && rows[0].diff === 0) {
+    room.say(animator.estExact(room.players.get(rows[0].id).name));
+    room.highlight('exact', 1, { emoji: '🎯', title: 'Pile dans le mille', body: `${room.players.get(rows[0].id).name} trouve exactement ${d.a.toLocaleString('fr-FR')} ${d.unit} : « ${d.q} »`, players: [rows[0].id] });
+  }
   else if (rows.length) room.say(animator.estClosest(room.players.get(rows[0].id).name));
   else room.say('Personne n’a osé répondre ? Allez, on tente sa chance la prochaine fois !');
   room.enter('estReveal', { ...d, rows });

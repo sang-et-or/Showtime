@@ -7,7 +7,7 @@ Dans le salon, l'hôte choisit son programme :
 
 | 🎬 **Le Grand Show** (plusieurs manches, podium final) | ⚡ **Partie rapide** (un seul jeu, 5 à 15 min) |
 | --- | --- |
-| 🧠 **Le Grand Quiz** : 4 réponses, bonus de rapidité et de série | 📝 **Le Petit Bac** : une lettre, 5 catégories, « STOP ! », contestation des réponses |
+| 🧠 **Le Grand Quiz** : 4 réponses, bonus de rapidité et de série (aussi jouable seul en partie rapide) | 📝 **Le Petit Bac** : une lettre, 5 catégories, « STOP ! », contestation des réponses |
 | 🤫 **Qui a osé dire ça ?** : réponses secrètes, devinez l'auteur | 🕵️ **L'Imposteur** : un mot secret pour tous sauf un, indices et votes (3 joueurs min.) |
 | 🎭 **Défi Surprise** : mimes à faire deviner, défis notés par le public | 🔤 **Le Mot mystère** : pendu collectif, lettres et mot entier |
 | ⚔️ **Le Grand Duel** : face-à-face, le public mise des points virtuels | 🎯 **L'Estimation** : un nombre, le plus proche gagne |
@@ -16,6 +16,19 @@ Dans le salon, l'hôte choisit son programme :
 🎡 **La Roue des Savoirs** (quiz sur plateau, étoiles à collectionner) · 🛤️ **Le Chemin de la Vie** (parcours de vie, fortune virtuelle) ·
 📅 **Fin de Mois** (calendrier, factures et bonnes affaires, argent fictif).
 Les trois derniers sont *inspirés* de grands classiques, mais avec nos propres noms, plateaux, règles et contenus.
+
+**🃏 Jeux de cartes** (les cartes restent cachées sur chaque téléphone, la table s'affiche à la télé) :
+🂡 **La Belote** (4 joueurs en équipes : prise, atout, obligations de fournir/monter/couper, belote-rebelote, dix de der, capot) ·
+♠️ **Le Poker** Texas Hold'em (2 à 8, blindes qui montent, tapis et pots annexes) · 👑 **Le Président** (3 à 8, échanges de cartes) ·
+🎴 **Le 8 américain** (2 à 8) · 🎰 **Le 21** (blackjack contre le croupier, tous en même temps) · 🃏 **La Bataille royale** (2 à 12).
+Jetons et argent toujours **virtuels**.
+
+**✋ Je suis prêt** : dans le salon, chaque joueur se déclare prêt sur son téléphone ; quand tout le monde l'est,
+un compte à rebours de 10 s lance la partie (l'hôte peut l'arrêter, ou relancer les retardataires avec « 📣 Qui est prêt ? »).
+
+**🧠 Quiz à thèmes** (près de 250 questions) : Culture générale, Géographie, Histoire, Cuisine, Hauts-de-France, Musique,
+Cinéma, Télé & séries, Jeux vidéo, Années 80 / 90 / 2000, Sport, Football, Foot insolite, **Clubs de L1** (18 clubs, à cocher),
+et **Coquin 🔞** (désactivé par défaut, confirmation « joueurs majeurs », jamais vulgaire, aucune rumeur sur des personnes réelles).
 
 Et partout : QR code et code à 4 lettres, prénoms et avatars, classements animés, **Grande Finale**
 avec compte à rebours, podium et confettis, animateur virtuel « Max Paillettes » (textes + voix),
@@ -194,7 +207,7 @@ et la machine à états centralise les transitions ; il suffira d'y vérifier un
 
 ## 5. Personnaliser
 
-- **Ajouter des questions** : `server/content/questions.js`, une ligne par question, **bonne réponse en premier**
+- **Ajouter des questions** : `server/content/questions.js`, `quiz-themes.js` (thèmes) ou `quiz-clubs.js` (clubs), une ligne par question, **bonne réponse en premier**
   (l'ordre est mélangé automatiquement à chaque partie).
 - **Ajouter des amorces** pour « Qui a osé dire ça ? » : `server/content/prompts.js`.
 - **Changer les répliques de l'animateur** : `server/animator.js`.
@@ -212,3 +225,43 @@ Après une modification, relancez `npm start` (ou utilisez `npm run dev`, qui re
   puis, dans le menu 🗣️, choisissez une voix marquée ⭐ « Online (Natural) ». Sur Chrome, prenez « Google français ».
 - Sur iPhone, le vibreur n'est pas disponible (limitation d'Apple) ; tout le reste fonctionne.
 - Aucune musique : seuls des bruitages générés par le navigateur sont utilisés (aucun droit d'auteur).
+
+---
+
+## 7. Comptes, historique, souvenirs et photos
+
+- **Compte facultatif** (page « 👤 Mon compte », lien en haut de l'accueil) : e-mail, mot de passe, pseudo et avatar.
+  Un joueur connecté retrouve chaque soirée dans son **historique** : jeux joués, classement, **cartes souvenirs** et **photos**.
+- **Cartes souvenirs automatiques** : le podium, le buzzer le plus rapide, le bluff de la soirée, la meilleure performance,
+  le plus gros pot au poker, le roi du bluff à l'Imposteur, le capot à la belote…
+- **📸 Photos** : bouton appareil photo sur chaque téléphone ; la photo s'affiche quelques secondes sur la télé (façon polaroïd)
+  et rejoint les souvenirs. L'hôte peut **désactiver les photos** dans le salon ou retirer une photo de l'écran (🗑️).
+- **Jouer sans compte puis le créer à la fin** : le bouton « Garder cette soirée » rattache la partie en cours au nouveau compte.
+- **Vie privée** : mots de passe chiffrés, photos visibles uniquement par les joueurs de la soirée, chacun peut supprimer
+  ses photos ou tout son compte (les classements restent, sans lien avec la personne). Un rappel invite à demander l'accord
+  des personnes photographiées avant la première photo.
+
+### Brancher la base de données Neon (gratuit, 10 minutes)
+
+Sans base de données, tout est enregistré dans le dossier `data/` de l'ordinateur (pratique pour tester chez soi).
+En ligne, Render efface ses fichiers à chaque redémarrage : il faut donc une base **Neon** (PostgreSQL gratuit).
+
+1. Allez sur **neon.tech** → **Sign up** (connexion possible avec GitHub ou Google). Aucune carte bancaire n'est demandée.
+2. Créez un projet : nom `showtime`, région **Europe (Frankfurt)**, version PostgreSQL proposée par défaut.
+3. Sur le tableau de bord, cliquez **Connect** : copiez la « Connection string » qui commence par `postgresql://…`
+   (gardez-la secrète : c'est la clé de votre base).
+4. Sur **Render** → votre service *Showtime* → **Environment** → **Add Environment Variable** :
+   *Key* = `DATABASE_URL`, *Value* = la chaîne copiée → **Save changes**. Render redémarre le jeu.
+5. Dans les journaux Render (**Logs**), vous devez voir `💾 Stockage : PostgreSQL`. Les tables se créent toutes seules.
+
+L'offre gratuite de Neon (0,5 Go) permet de garder plusieurs milliers de photos (elles sont réduites à ~150 Ko sur le téléphone).
+
+## 8. Jouer à distance : écran sur le téléphone et vote des jeux
+
+- **📺 Écran partagé** : en mode « À distance », chaque joueur voit le **plateau télé en direct sur la moitié haute de son
+  téléphone** (questions, plateaux, cartes, classements, podium…) et sa manette en dessous. Plus besoin de partager l'écran en visio.
+  Boutons « ⤢ Agrandir » et « ✕ Masquer » ; en mode « Même pièce », chacun peut l'afficher avec « 📺 Voir l'écran ».
+  Le son et la voix de l'animateur s'activent en touchant 🔊 sur le mini-écran.
+- **🗳️ Vote des jeux** : dans le salon, chaque joueur vote sur son téléphone pour le jeu qu'il veut (Grand Show, quiz,
+  plateaux, cartes). La télé affiche le décompte en direct ; au lancement (bouton de l'hôte ou « tous prêts »), le jeu le plus
+  voté est lancé, avec tirage au sort en cas d'égalité. Activé d'office à distance ; l'hôte peut choisir « 🎛️ Je choisis ».

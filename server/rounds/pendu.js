@@ -91,6 +91,7 @@ module.exports = {
       if (!guess) return;
       if (norm(guess) === norm(d.word)) {
         room.addScore(p.id, PTS_SOLVE + hidden(d.word, d.tried) * PTS_LETTER);
+        room.highlight('pendu', hidden(d.word, d.tried), { emoji: '🔤', title: 'Le mot trouvé au culot', body: `${p.name} devine « ${d.word} » avec ${hidden(d.word, d.tried)} lettres encore cachées !`, players: [p.id] });
         pushLog(d, { who: room.publicPlayer(p), guess: true, ok: true });
         reveal(room, p.id);
         return;

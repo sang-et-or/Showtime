@@ -116,6 +116,55 @@ function startBot(url, code, index, { log = () => {}, speed = 1 } = {}) {
         case 'vieTurn': case 'moisTurn':
           if (s.track.isTurn && s.stage === 'roll') later(() => act({ type: 'roll' }), 300, 700);
           break;
+        // ----- jeux de cartes -----
+        case 'batFlip':
+          if (s.bat.inGame && s.bat.myCards > 0 && !s.flipped) later(() => act({ type: 'flip' }), 200, 900);
+          break;
+        case 'bjBet':
+          if (s.bj.seated && !s.bet && s.bets.length) later(() => act({ type: 'bet', amount: pickOne(s.bets) }), 300, 900);
+          break;
+        case 'bjPlay':
+          if (s.mine && !s.mine.done) later(() => act({ type: s.mine.value < 16 ? 'hit' : 'stand' }), 300, 900);
+          break;
+        case 'pkPlay': {
+          const t = s.turn;
+          if (t && t.isTurn) {
+            const r = Math.random();
+            const msg = t.canCheck ? (r < 0.75 || !t.presets.length ? { type: 'check' } : { type: 'raise', to: t.presets[0] })
+              : r < 0.6 ? { type: 'call' } : r < 0.85 || !t.presets.length ? { type: 'fold' } : { type: 'raise', to: pickOne(t.presets) };
+            later(() => act(msg), 200, 700);
+          }
+          break;
+        }
+        case 'blBid':
+          if (s.myTurn) {
+            if (s.bidSuits) later(() => act(Math.random() < 0.5 ? { type: 'take', suit: pickOne(s.bidSuits) } : { type: 'pass' }), 200, 600);
+            else later(() => act({ type: Math.random() < 0.35 ? 'take' : 'pass' }), 200, 600);
+          }
+          break;
+        case 'blPlay':
+          if (s.myTurn && s.legal.length) later(() => act({ type: 'play', card: pickOne(s.legal) }), 200, 600);
+          break;
+        case 'prPlay':
+          if (s.myTurn) {
+            const ORDER = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+            const groups = {};
+            s.pr.hand.forEach((c) => { (groups[c.r] = groups[c.r] || []).push(c.id); });
+            const pileRank = s.pr.pile ? ORDER.indexOf(s.pr.pile.cards[0].r) : -1;
+            const need = s.need || 1;
+            const options = Object.entries(groups).filter(([r, ids]) => ids.length >= need && ORDER.indexOf(r) > pileRank)
+              .sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0]));
+            if (options.length && (!s.canPass || Math.random() < 0.8)) later(() => act({ type: 'play', cards: options[0][1].slice(0, need) }), 200, 600);
+            else if (s.canPass) later(() => act({ type: 'pass' }), 200, 600);
+          }
+          break;
+        case 'htPlay':
+          if (s.myTurn) {
+            if (s.playable.length) later(() => act({ type: 'play', card: s.playable[0], suit: pickOne(['S', 'H', 'D', 'C']) }), 200, 600);
+            else if (s.canDraw) later(() => act({ type: 'draw' }), 200, 600);
+            else if (s.canPass) later(() => act({ type: 'pass' }), 200, 600);
+          }
+          break;
         case 'vieEvent': case 'moisEvent':
           if (s.track.isTurn && s.choice && !s.chosen) later(() => act({ type: 'decide', yes: Math.random() < 0.5 }), 400, 900);
           break;

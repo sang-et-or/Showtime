@@ -76,7 +76,10 @@ function end(room, winner) {
   const winners = [...game.roles.entries()].filter(([, r]) => r === winner).map(([id]) => id);
   for (const id of winners) room.addScore(id, winner === 'civil' ? WIN_CIVIL : WIN_IMPOSTOR);
   if (winner === 'civil') room.say(animator.undWinCivils());
-  else room.say(animator.undWinImpostor(winners.map((id) => room.players.get(id)?.name || '?').join(' et ')));
+  else {
+    room.say(animator.undWinImpostor(winners.map((id) => room.players.get(id)?.name || '?').join(' et ')));
+    room.highlight('impostor', 1, { emoji: '🕵️', title: 'Le roi du bluff', body: `${winners.map((id) => room.players.get(id)?.name).join(' et ')} avait « ${game.impostor} » au lieu de « ${game.civil} »… et a berné tout le monde !`, players: winners });
+  }
   room.enter('undEnd', { g: room.ctx.und.g, total: room.ctx.und.total, winner, winners });
   room.setTimer(END_MS, () => newGame(room));
   room.sync();

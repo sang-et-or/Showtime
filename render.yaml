@@ -1,4 +1,4 @@
-services:
+﻿services:
   - type: web
     name: showtime
     runtime: node
@@ -6,3 +6,6 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false
