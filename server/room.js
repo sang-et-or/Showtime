@@ -82,7 +82,11 @@ class Room {
     this.timerTotal = ms;
     this.timerVisible = visible;
     this.pendingNext = fn;
-    this.timer = setTimeout(() => { this.pendingNext = null; this.timer = null; fn(); }, ms);
+    // Une erreur dans un jeu ne doit jamais faire tomber le serveur (et tous les autres salons avec lui).
+    this.timer = setTimeout(() => {
+      this.pendingNext = null; this.timer = null;
+      try { fn(); } catch (e) { console.error(`[${this.code}] erreur dans « ${this.phase} » :`, e); }
+    }, ms);
   }
 
   clearTimer() {

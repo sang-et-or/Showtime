@@ -53,6 +53,7 @@ function prompt(room) {
 /** Coup automatique : première carte jouable (le 8 choisit la couleur la plus présente), sinon piocher puis passer. */
 function auto(room, seat) {
   const g = room.ctx.ht;
+  if (!g || !g.hands[seat]) return; // plus personne à la table (tout le monde est parti)
   const card = g.hands[seat].find((c) => playable(g, c) && c.r !== '8') || g.hands[seat].find((c) => playable(g, c));
   if (card) { play(room, seat, card.id, bestSuit(g.hands[seat], card)); return; }
   if (!g.drewThisTurn) { draw(room, seat); if (g.turn === seat && room.phase === 'htPlay') auto(room, seat); return; }

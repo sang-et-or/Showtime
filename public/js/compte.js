@@ -14,7 +14,8 @@ async function api(method, url, body) {
 }
 const fmtDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const fmtTime = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-const header = (...extra) => h('div', { class: 'account-head' }, h('a', { class: 'logo account-logo', href: '/', text: 'SHOWTIME' }), ...extra);
+const header = (...extra) => h('div', { class: 'account-head' }, h('a', { class: 'logo account-logo', href: '/', text: 'SHOWTIME', title: 'Retour à l’accueil' }),
+  h('div', { class: 'account-head-actions' }, ...extra, h('a', { class: 'btn ghost', href: '/' }, '🏠 Accueil')));
 
 /** Si ce navigateur a joué sans être connecté, on propose de rattacher la partie au compte. */
 async function claimCurrentGame() {
@@ -148,7 +149,7 @@ async function showGallery() {
   const { photos, me: myId } = await api('GET', '/me/photos');
   const bySoiree = new Map();
   photos.forEach((p) => { if (!bySoiree.has(p.soireeId)) bySoiree.set(p.soireeId, []); bySoiree.get(p.soireeId).push(p); });
-  const back = h('a', { class: 'btn ghost', href: next || '/' }, next ? '↩️ Retour à la partie' : '🎬 Jouer');
+  const back = next ? h('a', { class: 'btn ghost', href: next }, '↩️ Retour à la partie') : '';
   const sections = [...bySoiree.values()].sort((a, b) => String(b[0].startedAt).localeCompare(String(a[0].startedAt))).map((list) => h('section', { class: 'dir-folder' },
     h('button', { class: 'dir-folder-head', onclick: () => showSoiree(list[0].soireeId) },
       h('span', { text: '📁' }), h('b', { text: fmtDate(list[0].startedAt) }), h('small', { text: `salon ${list[0].code} · ${list.length} image${list.length > 1 ? 's' : ''} ›` })),
