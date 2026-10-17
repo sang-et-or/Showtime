@@ -1,0 +1,442 @@
+﻿// Écran hôte : le « plateau télé ». Il affiche l'état envoyé par le serveur et joue l'ambiance.
+/* global io, $, h, avatarEl, SHAPES, SFX, Voice, confetti, keepAwake, makeCountdown, toast, fmt */
+
+const socket = io({ transports: ['websocket', 'polling'] });
+const STORE = 'showtime-host';
+let params = new URLSearchParams(location.search);
+let state = null;
+let viewKey = null;
+let view = null; // { update(state) } de la vue courante
+let curtainOpen = false;
+let lastLine = { id: -1, text: '' };
+let knownPlayers = new Set();
+let joinInfo = null;
+let timeouts = [];
+
+const later = (ms, fn) => timeouts.push(setTimeout(fn, ms));
+const clearLater = () => { timeouts.forEach(clearTimeout); timeouts = []; };
+const action = (type, extra = {}) => socket.emit('host:action', { type, ...extra });
+const loadHost = () => { try { return JSON.parse(localStorage.getItem(STORE)); } catch { return null; } };
+const saveHost = (code, token) => { try { localStorage.setItem(STORE, JSON.stringify({ code, token })); } catch { /* navigation privée */ } };
+
+// ---------------------------------------------------------------------------
+// Connexion / reprise
+// ---------------------------------------------------------------------------
+socket.on('connect', () => {
+  $('.offline-banner')?.remove();
+  const saved = loadHost();
+  const room = params.get('room');
+  if (room) {
+    if (!saved || saved.code !== room) return expired();
+    socket.emit('host:resume', { code: saved.code, hostToken: saved.token }, (res) => { if (res.error) expired(); else ready(); });
+  } else if (params.get('new')) {
+    socket.emit('host:create', { mode: params.get('new') === 'remote' ? 'remote' : 'local' }, (res) => {
+      if (res.error) { toast(res.error, 6000); return; }
+      saveHost(res.code, res.hostToken);
+      history.replaceState(null, '', `/host?room=${res.code}`);
+      params = new URLSearchParams(location.search);
+      ready();
+    });
+  } else {
+    location.href = '/';
+  }
+});
+
+socket.on('disconnect', () => {
+  if (!$('.offline-banner')) document.body.append(h('div', { class: 'offline-banner', text: 'Connexion perdue… reconnexion en cours' }));
+});
+
+socket.on('state', (s) => render(s));
+
+function ready() {
+  const b = $('#open-curtain');
+  b.disabled = false;
+  b.textContent = 'Ouvrir le plateau 🎬';
+}
+
+function expired() {
+  $('#curtain').classList.add('hidden');
+  $('#view').replaceChildren(h('div', { class: 'round-intro' },
+    h('div', { class: 'icon', text: '🕰️' }),
+    h('h1', { text: 'Salon expiré' }),
+    h('p', { text: 'Ce salon n’existe plus (le serveur a peut-être redémarré). Créez-en un nouveau, ça prend 2 secondes !' }),
+    h('a', { class: 'btn gold big', href: '/host?new=local', text: 'Créer un nouveau salon' })));
+}
+
+// ---------------------------------------------------------------------------
+// Boutons de la barre du haut
+// ---------------------------------------------------------------------------
+$('#open-curtain').addEventListener('click', () => {
+  SFX.unlock();
+  curtainOpen = true;
+  $('#curtain').classList.add('open');
+  setTimeout(() => $('#curtain').classList.add('hidden'), 1000);
+  SFX.fanfare();
+  keepAwake();
+  if (state) setTimeout(() => speak(state.line.text), 900);
+});
+$('#btn-skip').addEventListener('click', () => action('skip'));
+$('#btn-end').addEventListener('click', () => { if (confirm('Passer directement à la Grande Finale ?')) action('end'); });
+$('#btn-voice').addEventListener('click', (e) => {
+  Voice.enabled = !Voice.enabled;
+  e.currentTarget.setAttribute('aria-pressed', String(Voice.enabled));
+});
+$('#btn-sound').addEventListener('click', (e) => {
+  SFX.muted = !SFX.muted;
+  e.currentTarget.setAttribute('aria-pressed', String(!SFX.muted));
+});
+$('#btn-fs').addEventListener('click', () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.().catch(() => {});
+});
+if (!Voice.supported) $('#btn-voice').hidden = true;
+
+// ---------------------------------------------------------------------------
+// L'animateur
+// ---------------------------------------------------------------------------
+function speak(text) {
+  const mic = $('#mic');
+  Voice.speak(text, () => mic.classList.add('talking'), () => mic.classList.remove('talking'));
+}
+
+function showLine(line) {
+  if (!line || line.id === lastLine.id) return;
+  lastLine = line;
+  const said = $('#said');
+  said.replaceChildren(...line.text.split(' ').map((w, i) => {
+    const s = h('span', { text: `${w} ` });
+    s.style.animationDelay = `${i * 45}ms`;
+    return s;
+  }));
+  if (curtainOpen) speak(line.text);
+}
+
+// ---------------------------------------------------------------------------
+// Minuteur
+// ---------------------------------------------------------------------------
+const TIMED = new Set(['writing', 'quizQuestion', 'whoVote']);
+const CIRC = 276.5;
+const countdown = makeCountdown((left, total, sec, changed) => {
+  const t = $('#timer');
+  if (!total) { t.classList.add('hidden'); return; }
+  t.classList.remove('hidden');
+  $('#timer-bar').setAttribute('stroke-dashoffset', String(CIRC * (1 - left / total)));
+  $('#timer-num').textContent = sec;
+  t.classList.toggle('hurry', sec <= 5);
+  if (changed && sec <= 5 && sec > 0 && state && state.phase !== 'writing') (sec % 2 ? SFX.tick : SFX.tock)();
+});
+
+// ---------------------------------------------------------------------------
+// Rendu principal
+// ---------------------------------------------------------------------------
+function keyOf(s) {
+  if (s.phase === 'quizQuestion' || s.phase === 'quizReveal') return `${s.phase}:${s.q.index}`;
+  if (s.phase === 'whoVote' || s.phase === 'whoReveal') return `${s.phase}:${s.who.index}`;
+  if (s.phase === 'roundIntro') return `${s.phase}:${s.round.round}`;
+  if (s.phase === 'leaderboard') return `${s.phase}:${s.title}`;
+  return s.phase;
+}
+
+const ROUND_LABEL = {
+  lobby: 'Salon d’attente', writing: 'Préparation', quizQuestion: 'Manche 1 · Le Grand Quiz', quizReveal: 'Manche 1 · Le Grand Quiz',
+  leaderboard: 'Classement', whoVote: 'Manche 2 · Qui a osé dire ça ?', whoReveal: 'Manche 2 · Qui a osé dire ça ?', final: 'La Grande Finale',
+};
+
+function render(s) {
+  const prev = state;
+  state = s;
+  $('#code-pill').hidden = false;
+  $('#code-txt').textContent = s.code;
+  $('#round-label').textContent = s.phase === 'roundIntro' ? `Manche ${s.round.num}` : ROUND_LABEL[s.phase] || '';
+  $('#btn-skip').hidden = !s.canSkip || s.phase === 'lobby';
+  $('#btn-end').hidden = ['lobby', 'final'].includes(s.phase);
+
+  // Nouveaux arrivants : petit « pop » sonore.
+  const ids = new Set(s.players.map((p) => p.id));
+  if (prev && [...ids].some((id) => !knownPlayers.has(id))) SFX.pop();
+  knownPlayers = ids;
+
+  const key = keyOf(s);
+  if (key !== viewKey) {
+    viewKey = key;
+    clearLater();
+    const builder = VIEWS[s.phase] || VIEWS.lobby;
+    const root = h('div', { class: 'view' });
+    $('#view').replaceWith(root);
+    root.id = 'view';
+    view = builder(root, s) || {};
+  }
+  if (view.update) view.update(s, prev);
+  countdown.set(TIMED.has(s.phase) ? s.remainingMs : 0, TIMED.has(s.phase) ? s.totalMs : 0);
+  showLine(s.line);
+}
+
+// ---------------------------------------------------------------------------
+// Vues
+// ---------------------------------------------------------------------------
+const VIEWS = {
+  lobby(root, s) {
+    const qr = h('div', { class: 'qr', 'aria-label': 'QR code pour rejoindre' });
+    const url = h('div', { class: 'url' });
+    const remoteTip = h('div', { class: 'remote-tip hidden' });
+    const joinCard = h('div', { class: 'join-card panel' },
+      h('div', { style: 'font-weight:800;font-size:1.3em', text: '📱 Scannez pour jouer !' }),
+      qr,
+      h('div', { style: 'color:var(--muted)', text: 'ou allez sur le site et tapez le code' }),
+      h('div', { class: 'big-code', text: s.code }),
+      url, remoteTip);
+
+    const fillJoin = () => {
+      if (!joinInfo) return;
+      qr.innerHTML = joinInfo.svg; // SVG généré par notre propre serveur
+      url.replaceChildren(h('b', { text: joinInfo.url.replace(/^https?:\/\//, '') }));
+    };
+    if (joinInfo && joinInfo.code === s.code) fillJoin();
+    else {
+      fetch(`/api/join-info?room=${encodeURIComponent(s.code)}`).then((r) => r.json()).then((j) => { joinInfo = { ...j, code: s.code }; fillJoin(); view.update(state); });
+    }
+
+    const castGrid = h('div', { class: 'cast-grid' });
+    const castTitle = h('h3');
+    const cast = h('div', { class: 'cast panel' }, castTitle, castGrid);
+    const settings = h('div', { class: 'settings panel' });
+    const startBtn = h('button', { class: 'btn gold big', onclick: () => action('start') }, 'Lever le rideau ! ✨');
+    const hint = h('div', { class: 'hint' });
+    root.append(h('div', { class: 'lobby' }, joinCard, h('div', { class: 'lobby-right' }, cast, settings, h('div', { class: 'start-row' }, startBtn, hint))));
+
+    const chip = (label, on, onclick) => h('button', { class: `chip${on ? ' on' : ''}`, 'aria-pressed': String(on), onclick }, label);
+    const send = (patch) => action('settings', { settings: { ...state.settings, ...patch } });
+
+    return {
+      update(st) {
+        castTitle.textContent = `⭐ Les stars de ce soir (${st.players.length}/12)`;
+        if (!st.players.length) castGrid.replaceChildren(h('div', { class: 'empty-cast', text: 'En attente des premières stars… Scannez le QR code !' }));
+        else {
+          castGrid.replaceChildren(...st.players.map((p) => h('div', { class: 'cast-item' },
+            avatarEl(p, p.connected ? '' : 'off'),
+            h('div', { class: 'name', text: p.name }),
+            h('button', { class: 'kick', title: `Retirer ${p.name}`, 'aria-label': `Retirer ${p.name}`, onclick: () => { if (confirm(`Retirer ${p.name} du plateau ?`)) action('kick', { playerId: p.id }); } }, '✕'))));
+        }
+
+        const se = st.settings;
+        settings.replaceChildren(
+          h('h3', { text: '🎛️ Réglages du show' }),
+          h('div', { class: 'row' }, h('span', { text: 'Mode' }),
+            chip('🛋️ Même pièce', se.mode === 'local', () => send({ mode: 'local' })),
+            chip('🌍 À distance', se.mode === 'remote', () => send({ mode: 'remote' }))),
+          h('div', { class: 'row' }, h('span', { text: 'Questions du quiz' }),
+            ...[5, 8, 12].map((n) => chip(String(n), se.quizCount === n, () => send({ quizCount: n })))),
+          h('div', { class: 'row' }, h('span', { text: 'Thèmes' }),
+            ...Object.entries(st.categories).map(([k, c]) => chip(`${c.icon} ${c.label}`, se.categories.includes(k), () => {
+              const cats = se.categories.includes(k) ? se.categories.filter((x) => x !== k) : [...se.categories, k];
+              if (cats.length) send({ categories: cats });
+            }))),
+          h('div', { class: 'row' }, h('span', { text: 'Manche 2' }),
+            chip('🤫 Qui a osé dire ça ?', se.whoSaid, () => send({ whoSaid: !se.whoSaid }))),
+        );
+
+        const online = st.players.filter((p) => p.connected).length;
+        startBtn.disabled = online < 1;
+        hint.textContent = online < 1 ? 'Il faut au moins une star pour commencer.'
+          : online < 3 ? 'Astuce : c’est plus drôle à partir de 3 joueurs !' : 'Tout le monde est là ? C’est parti !';
+
+        if (st.settings.mode === 'remote') {
+          remoteTip.classList.remove('hidden');
+          const local = joinInfo && /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(joinInfo.base || '');
+          remoteTip.replaceChildren(
+            h('div', { text: local
+              ? '⚠️ À distance : ce lien ne marche que sur votre Wi-Fi. Hébergez le jeu en ligne pour inviter des amis éloignés (voir le guide).'
+              : '🌍 Partagez cet écran dans votre visio et envoyez le lien à vos invités.' }),
+            joinInfo ? h('button', { class: 'chip', style: 'margin-top:0.5em', onclick: () => navigator.clipboard?.writeText(joinInfo.url).then(() => toast('Lien copié !')) }, '📋 Copier le lien') : '');
+        } else remoteTip.classList.add('hidden');
+      },
+    };
+  },
+
+  writing(root) {
+    SFX.whoosh();
+    const grid = h('div', { class: 'cast-grid', style: 'justify-content:center' });
+    root.append(h('div', { class: 'round-intro', style: 'justify-content:flex-start;padding-top:1em' },
+      h('div', { class: 'icon', style: 'font-size:4em', text: '✍️' }),
+      h('h1', { style: 'font-size:2.8em', text: 'Écriture secrète' }),
+      h('p', { text: 'Sur vos téléphones, répondez à 2 petites questions. C’est anonyme… jusqu’à la manche « Qui a osé dire ça ? » 😈' }),
+      grid));
+    return {
+      update(st, prev) {
+        const done = new Set(st.done);
+        if (prev && prev.done && st.done.length > prev.done.length) SFX.blip();
+        grid.replaceChildren(...st.players.map((p) => h('div', { class: 'cast-item' },
+          avatarEl(p, done.has(p.id) ? '' : 'off'),
+          h('div', { class: 'name', text: p.name }),
+          h('div', { style: `font-size:0.85em;font-weight:700;color:${done.has(p.id) ? 'var(--green)' : 'var(--muted)'}`, text: done.has(p.id) ? '✓ Prêt' : '✏️ écrit…' }))));
+      },
+    };
+  },
+
+  roundIntro(root, s) {
+    SFX.whoosh();
+    later(400, SFX.fanfare);
+    root.append(h('div', { class: 'round-intro' },
+      h('div', { class: 'num', text: `MANCHE ${s.round.num}` }),
+      h('div', { class: 'icon', text: s.round.icon }),
+      h('h1', { text: s.round.title }),
+      h('p', { text: s.round.subtitle })));
+  },
+
+  quizQuestion(root, s) {
+    SFX.whoosh();
+    const cat = s.categories[s.q.cat];
+    const strip = h('div', { class: 'answered-strip' });
+    root.append(
+      h('div', { class: 'q-head' }, h('span', { class: 'chip', text: `${cat.icon} ${cat.label}` }), h('span', { class: 'count', text: `Question ${s.q.index} / ${s.q.total}` })),
+      h('div', { class: 'q-text', text: s.q.text }),
+      h('div', { class: 'answers' }, ...s.q.choices.map((c, i) => h('div', { class: `answer c${i}` }, h('span', { class: 'shape', text: SHAPES[i] }), h('span', { text: c })))),
+      strip);
+    return {
+      update(st, prev) {
+        const done = new Set(st.answered);
+        if (prev && prev.answered && st.answered.length > prev.answered.length) SFX.blip();
+        const online = st.players.filter((p) => p.connected);
+        strip.replaceChildren(h('span', { class: 'label', text: `${done.size} / ${online.length} ont répondu` }),
+          ...online.map((p) => { const a = avatarEl(p, 'sm'); if (!done.has(p.id)) a.classList.add('wait'); return a; }));
+      },
+    };
+  },
+
+  quizReveal(root, s) {
+    const cat = s.categories[s.q.cat];
+    const total = Math.max(1, s.counts.reduce((a, b) => a + b, 0));
+    const tiles = s.q.choices.map((c, i) => {
+      const bar = h('div', { class: 'count-bar', style: 'width:0%' });
+      later(300, () => { bar.style.width = `${(s.counts[i] / total) * 100}%`; });
+      return h('div', { class: `answer c${i}${i === s.correct ? ' good' : ' dim'}`, style: 'animation:none' },
+        h('span', { class: 'shape', text: i === s.correct ? '✓' : SHAPES[i] }), h('span', { text: c }), h('span', { class: 'n', text: `${s.counts[i]} 👤` }), bar);
+    });
+    const byId = new Map(s.players.map((p) => [p.id, p]));
+    const results = [...s.results].filter((r) => byId.has(r.id)).sort((a, b) => b.gained - a.gained);
+    root.append(
+      h('div', { class: 'q-head' }, h('span', { class: 'chip', text: `${cat.icon} ${cat.label}` }), h('span', { class: 'count', text: `Question ${s.q.index} / ${s.q.total}` })),
+      h('div', { class: 'q-text', style: 'animation:none', text: s.q.text }),
+      h('div', { class: 'answers' }, ...tiles),
+      h('div', { class: 'gains' }, ...results.map((r, k) => {
+        const g = h('div', { class: `gain ${r.correct ? 'ok' : 'ko'}` }, avatarEl(byId.get(r.id), 'sm'),
+          h('span', { text: byId.get(r.id).name }),
+          h('b', { text: r.correct ? `+${fmt(r.gained)}` : (r.choice == null ? '⏱️' : '✗') }),
+          r.correct && r.streak >= 2 ? h('small', { text: `🔥×${r.streak}` }) : null);
+        g.style.animationDelay = `${0.6 + k * 0.08}s`;
+        return g;
+      })));
+    SFX.reveal();
+    later(350, () => (results.some((r) => r.correct) ? SFX.correct() : SFX.wrong()));
+  },
+
+  leaderboard(root, s) {
+    SFX.whoosh();
+    const board = h('div', { class: 'board' });
+    root.append(h('div', { class: 'board-title', text: s.title }), board);
+    const rows = s.ranking;
+    const prevOrder = [...rows].sort((a, b) => a.prevRank - b.prevRank);
+    requestAnimationFrame(() => {
+      const step = Math.min(board.clientHeight / Math.max(rows.length, 1), 72);
+      board.style.height = `${step * rows.length}px`;
+      const els = new Map();
+      prevOrder.forEach((r, i) => {
+        const sc = h('span', { class: 'sc', text: fmt(r.prevScore) });
+        const pos = h('span', { class: 'pos', text: String(r.prevRank) });
+        const move = h('span', { class: 'move' });
+        const row = h('div', { class: 'board-row', style: `top:${i * step}px;height:${step - 8}px` }, pos, avatarEl(r, 'sm'), h('span', { class: 'nm', text: r.name }), move, sc);
+        if (step < 50) row.style.fontSize = '0.9em';
+        board.append(row);
+        els.set(r.id, { row, sc, pos, move });
+      });
+      later(900, () => {
+        SFX.drumroll(0.9);
+        rows.forEach((r, i) => {
+          const e = els.get(r.id);
+          e.row.style.top = `${i * step}px`;
+          e.pos.textContent = String(r.rank);
+          if (r.rank === 1) e.row.classList.add('first');
+          if (r.rank < r.prevRank) { e.move.textContent = '▲'; e.move.className = 'move up'; }
+          else if (r.rank > r.prevRank) { e.move.textContent = '▼'; e.move.className = 'move down'; }
+          countUp(e.sc, r.prevScore, r.score, 1100);
+        });
+      });
+    });
+  },
+
+  whoVote(root, s) {
+    SFX.whoosh();
+    const strip = h('div', { class: 'answered-strip', style: 'justify-content:center' });
+    root.append(
+      h('div', { class: 'q-head' }, h('span', { class: 'chip', text: '🤫 Qui a osé dire ça ?' }), h('span', { class: 'count', text: `Réponse ${s.who.index} / ${s.who.total}` })),
+      h('div', { class: 'quote-card panel' }, h('div', { class: 'prompt', text: s.who.prompt }), h('div', { class: 'quote', text: s.who.text })),
+      h('p', { style: 'text-align:center;font-size:1.3em;font-weight:700;margin:1em 0 0', text: '📱 Votez sur votre téléphone : qui a écrit ça ?' }),
+      strip);
+    return {
+      update(st, prev) {
+        const done = new Set(st.voted);
+        if (prev && prev.voted && st.voted.length > prev.voted.length) SFX.blip();
+        const voters = st.players.filter((p) => st.voters.includes(p.id));
+        strip.replaceChildren(h('span', { class: 'label', text: `${done.size} / ${voters.length} ont voté` }),
+          ...voters.map((p) => { const a = avatarEl(p, 'sm'); if (!done.has(p.id)) a.classList.add('wait'); return a; }));
+      },
+    };
+  },
+
+  whoReveal(root, s) {
+    const byId = new Map(s.players.map((p) => [p.id, p]));
+    const author = byId.get(s.authorId);
+    SFX.drumroll(1.5);
+    later(1600, () => SFX.reveal());
+    later(1900, () => (s.fooled > 0 && s.found === 0 ? SFX.applause(2) : SFX.correct()));
+    root.append(
+      h('div', { class: 'q-head' }, h('span', { class: 'chip', text: '🤫 Qui a osé dire ça ?' }), h('span', { class: 'count', text: `Réponse ${s.who.index} / ${s.who.total}` })),
+      h('div', { class: 'quote-card panel', style: 'animation:none' }, h('div', { class: 'prompt', text: s.who.prompt }), h('div', { class: 'quote', text: s.who.text })),
+      author ? h('div', { class: 'reveal-author' },
+        avatarEl(author, 'lg'),
+        h('div', { class: 'who-name', text: `C'était ${author.name} !` }),
+        s.authorGain ? h('div', { class: 'bluff', text: `+${fmt(s.authorGain)} pour le bluff 😏` }) : null) : '',
+      h('div', { class: 'votes-list' }, ...s.results.filter((r) => byId.has(r.id) && byId.has(r.target)).map((r, k) => {
+        const pill = h('div', { class: `vote-pill ${r.correct ? 'ok' : 'ko'}` },
+          avatarEl(byId.get(r.id), 'sm'), h('span', { text: `${byId.get(r.id).name} → ${byId.get(r.target).name}` }),
+          h('span', { text: r.correct ? ' ✓ +500' : ' ✗' }));
+        pill.style.animationDelay = `${2.4 + k * 0.1}s`;
+        return pill;
+      })));
+  },
+
+  final(root, s) {
+    const r = s.ranking;
+    const cd = h('div', { class: 'countdown' });
+    const step = (p, cls) => {
+      if (!p) return h('div', { class: `step ${cls}` });
+      return h('div', { class: `step ${cls}` },
+        h('div', { class: 'who' }, cls === 'p1' ? h('div', { class: 'crown', text: '👑' }) : null, avatarEl(p, cls === 'p1' ? '' : 'lg'),
+          h('div', { class: 'nm', text: p.name }), h('div', { class: 'sc', text: `${fmt(p.score)} pts` })),
+        h('div', { class: 'block', text: String(p.rank) }));
+    };
+    const s1 = step(r[0], 'p1'); const s2 = step(r[1], 'p2'); const s3 = step(r[2], 'p3');
+    const rest = h('div', { class: 'final-rest' }, ...r.slice(3).map((p) => h('div', { class: 'gain' }, avatarEl(p, 'sm'), h('span', { text: `${p.rank}. ${p.name}` }), h('b', { style: 'color:var(--gold)', text: fmt(p.score) }))));
+    const actions = h('div', { class: 'final-actions' },
+      h('button', { class: 'btn gold big', onclick: () => action('restart') }, 'Rejouer avec la même équipe 🔁'),
+      h('a', { class: 'btn ghost big', href: '/' }, 'Accueil'));
+    root.append(h('div', { class: 'final' }, cd, h('div', { class: 'podium' }, s2, s1, s3), rest, actions));
+
+    SFX.drumroll(3);
+    [3, 2, 1].forEach((n, i) => later(i * 1000, () => { cd.replaceChildren(h('span', { text: String(n) })); SFX.beep(false); }));
+    later(3000, () => cd.replaceChildren());
+    later(3300, () => { if (r[2]) { s3.classList.add('show'); SFX.pop(); } });
+    later(4800, () => { if (r[1]) { s2.classList.add('show'); SFX.pop(); } });
+    later(6600, () => { s1.classList.add('show'); SFX.fanfare(); SFX.applause(4); confetti(6000); });
+    later(8500, () => { rest.classList.add('show'); actions.classList.add('show'); });
+  },
+};
+
+function countUp(el, from, to, ms) {
+  const t0 = performance.now();
+  (function f(now) {
+    const k = Math.min(1, (now - t0) / ms);
+    el.textContent = fmt(Math.round(from + (to - from) * (1 - (1 - k) ** 3)));
+    if (k < 1) requestAnimationFrame(f);
+  }(t0));
+}

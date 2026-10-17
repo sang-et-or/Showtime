@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SHOWTIME – Plateau</title>
+  <meta name="theme-color" content="#0b0420">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="host">
+  <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="floor" aria-hidden="true"></div>
+
+  <div class="curtain" id="curtain">
+    <div class="inner">
+      <div class="logo">SHOWTIME</div>
+      <p>Montez le son 🔊 et branchez l'ordinateur sur la télé si vous pouvez. Le spectacle va commencer !</p>
+      <button class="btn gold big" id="open-curtain" disabled>Préparation du plateau…</button>
+    </div>
+  </div>
+
+  <div class="host-wrap">
+    <header class="topbar">
+      <div class="logo">SHOWTIME</div>
+      <div class="code-pill" id="code-pill" hidden>Code : <b id="code-txt"></b></div>
+      <div class="round-label" id="round-label"></div>
+      <div class="spacer"></div>
+      <button class="tool text" id="btn-skip" hidden title="Passer à la suite">Suivant ⏭</button>
+      <button class="tool text" id="btn-end" hidden title="Aller directement à la Grande Finale">Finale 🏁</button>
+      <button class="tool" id="btn-voice" aria-pressed="true" title="Voix de l'animateur">🗣️</button>
+      <button class="tool" id="btn-sound" aria-pressed="true" title="Bruitages">🔊</button>
+      <button class="tool" id="btn-fs" title="Plein écran">⛶</button>
+    </header>
+
+    <main class="screen" id="screen">
+      <div class="timer hidden" id="timer" aria-live="off">
+        <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="44"/><circle class="bar" id="timer-bar" cx="50" cy="50" r="44" stroke-dasharray="276.5" stroke-dashoffset="0"/></svg>
+        <div class="num" id="timer-num"></div>
+      </div>
+      <div class="view" id="view"></div>
+    </main>
+
+    <footer class="mc" aria-live="polite">
+      <div class="mic" id="mic">🎙️</div>
+      <div>
+        <div class="who">Max Paillettes · votre animateur</div>
+        <div class="said" id="said"></div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/host.js"></script>
+</body>
+</html>
