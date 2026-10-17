@@ -7,11 +7,14 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const QRCode = require('qrcode');
-const { Room, sanitizeText } = require('./room');
+const { Room } = require('./room');
+const { sanitizeText } = require('./util');
 
 const PORT = Number(process.env.PORT) || 3000;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sans I ni O, pour éviter les confusions
 const MAX_ROOMS = 500;
+// Codes à éviter à l'écran (gros mots et ressemblances).
+const BAD_CODES = /^(F[UX]CK|FXXK|SHIT|CACA|PIPI|PUTE|PUTA|CONS|CONE|BITE|CULS|NAZI|SUCE|SEXE|SEXY|MERD|KKK.|PD..)$/;
 
 const app = express();
 app.disable('x-powered-by');
@@ -22,7 +25,8 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   next();
 });
-app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
+// « no-cache » : le navigateur revérifie chaque fichier, pour que tout le monde ait la dernière version après une mise à jour.
+app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'], setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
 const server = http.createServer(app);
 const io = new Server(server, { pingInterval: 10_000, pingTimeout: 8_000, maxHttpBufferSize: 10_000 });
@@ -80,7 +84,7 @@ function newCode() {
   for (let n = 0; n < 1000; n++) {
     let code = '';
     for (let i = 0; i < 4; i++) code += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
-    if (!rooms.has(code)) return code;
+    if (!rooms.has(code) && !BAD_CODES.test(code)) return code;
   }
   throw new Error('Plus de codes disponibles');
 }
@@ -178,9 +182,8 @@ io.on('connection', (socket) => {
     if (!p || p.socketId !== socket.id) return;
     fn(room, p, msg || {});
   };
-  socket.on('player:answer', playerAction((room, p, msg) => room.answer(p.id, msg.choice)));
-  socket.on('player:write', playerAction((room, p, msg) => room.submitWriting(p.id, msg.answers)));
-  socket.on('player:vote', playerAction((room, p, msg) => room.vote(p.id, String(msg.target || ''))));
+  // Toutes les actions de jeu passent par un seul message : { type: 'answer' | 'vote' | 'letter' | … }.
+  socket.on('player:act', playerAction((room, p, msg) => room.act(p, msg)));
   socket.on('player:leave', playerAction((room, p) => room.kick(p.id)));
 
   socket.on('disconnect', () => {

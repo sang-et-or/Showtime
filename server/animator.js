@@ -1,4 +1,4 @@
-// L'animateur virtuel « Max Paillettes ».
+﻿// L'animateur virtuel « Max Paillettes ».
 // Toutes ses répliques passent par ce module : il renvoie du texte, que l'écran hôte
 // affiche et lit en synthèse vocale. Pour faire évoluer l'animateur (IA générative,
 // voix enregistrées, avatar animé…), il suffit de remplacer ces fonctions : le reste
@@ -58,6 +58,75 @@ const lines = {
     if (fooled === 0 && found > 0) return pick([`C'était ${author}, et tout le monde a trouvé ! Trop prévisible !`, `${author} ! Vous vous connaissez trop bien.`]);
     return pick([`Et c'était… ${author} !`, `C'était… ${author} ! Bravo aux fins limiers.`]);
   },
+  // ----- Défi Surprise -----
+  defiIntro: () => pick([
+    `Défi Surprise ! Chacun son tour, vous recevez un défi secret. Mimes, imitations, performances… le public est votre juge !`,
+    `Place au Défi Surprise ! Sortez de votre zone de confort, les caméras tournent !`,
+  ]),
+  defiTurn: (name) => pick([`${name}, à toi de briller ! Regarde ton téléphone, en toute discrétion.`, `Projecteurs sur ${name} ! Ton défi t'attend sur ton téléphone.`]),
+  mimeGo: (name) => pick([`${name} mime en silence ! Criez vos propositions !`, `Silence total pour ${name}… mais vous, criez !`]),
+  defiGo: (name) => pick([`À toi, ${name} ! Le public te regarde.`, `Moteur… action, ${name} !`]),
+  mimeFound: (perf, finder) => pick([`${finder} a trouvé ! Bravo à ${perf} pour ce mime de génie !`, `Bien joué ${finder} ! Et ${perf}, quel talent d'acteur !`]),
+  mimeFail: (perf) => pick([`Personne n'a trouvé… ${perf}, on garde ton numéro pour le théâtre, mais pas tout de suite.`, `Raté ! Le mime de ${perf} restera un mystère.`]),
+  defiVote: (name) => pick([`Public, à vos téléphones ! Combien d'étoiles pour ${name} ?`, `Le jury, c'est vous : notez ${name} !`]),
+  defiScore: (name, avg) => (avg >= 4
+    ? pick([`${avg} étoiles de moyenne pour ${name} ! Une standing ovation !`, `${name} fait un triomphe : ${avg} étoiles !`])
+    : avg >= 2.5 ? `${avg} étoiles pour ${name}. Honnête, très honnête !`
+      : pick([`${avg} étoiles pour ${name}… Le public est sévère ce soir !`, `${name} récolte ${avg} étoiles. Il y aura une revanche !`])),
+
+  // ----- Grand Duel -----
+  duelIntro: () => pick([
+    `Le Grand Duel ! Deux stars face à face, premier à 3 points. Et vous, le public, misez sur votre champion !`,
+    `L'heure du Grand Duel a sonné ! Un contre un, et le public parie ses points. Qui va tout rafler ?`,
+  ]),
+  duelBet: (a, b) => pick([`${a} contre ${b} ! Public, faites vos jeux !`, `Ce soir, ${a} affronte ${b}. Misez sur le bon cheval !`]),
+  duelPoint: (name) => pick([`Point pour ${name} !`, `${name} dégaine et marque !`, `Et c'est ${name} qui prend le point !`]),
+  duelNoPoint: () => pick([`Personne ne marque, la tension monte !`, `Raté des deux côtés !`]),
+  duelWin: (name) => pick([`${name} remporte le Grand Duel ! Quelle bataille !`, `Victoire de ${name} ! Les parieurs malins se frottent les mains.`]),
+  duelDraw: () => `Match nul ! Les mises sont rendues, tout le monde respire.`,
+
+  // ----- Petit Bac -----
+  bacIntro: () => pick([
+    `Le Petit Bac ! Une lettre, cinq catégories. Le premier qui a tout rempli peut crier STOP !`,
+    `Sortez vos méninges, c'est le Petit Bac ! Réponses originales = plus de points.`,
+  ]),
+  bacLetter: (letter) => pick([`La lettre est… ${letter} ! C'est parti !`, `Tout commence par la lettre ${letter}. Top chrono !`]),
+  bacStop: (name) => pick([`STOP ! ${name} a tout rempli ! Plus que 10 secondes pour les autres !`, `${name} crie STOP ! Dépêchez-vous, 10 secondes !`]),
+  bacReview: () => pick([`Vérification ! Contestez les réponses douteuses sur vos téléphones.`, `Place à l'arbitrage : une réponse vous paraît louche ? Contestez-la !`]),
+  bacBest: (name) => pick([`${name} remporte cette manche du Petit Bac !`, `Meilleur score pour ${name} !`]),
+
+  // ----- L'Imposteur -----
+  undIntro: () => pick([
+    `L'Imposteur ! Vous avez tous le même mot secret… sauf un. Donnez un indice chacun votre tour, puis démasquez l'intrus !`,
+    `Méfiance ! Un imposteur se cache parmi vous avec un mot différent. Écoutez bien les indices !`,
+  ]),
+  undClues: (first) => pick([`${first} commence ! Un seul mot d'indice chacun, à voix haute.`, `On fait le tour des indices, en commençant par ${first}.`]),
+  undVote: () => pick([`Aux votes ! Qui est l'imposteur ?`, `Le moment de vérité : votez contre le suspect !`]),
+  undTie: () => `Égalité ! Personne n'est éliminé, on refait un tour d'indices.`,
+  undOut: (name, wasImpostor) => (wasImpostor
+    ? pick([`${name} était bien l'IMPOSTEUR ! Bien joué l'équipe !`, `Démasqué ! ${name} était l'imposteur !`])
+    : pick([`${name} n'avait rien à se reprocher… Oups ! L'imposteur court toujours.`, `Erreur judiciaire ! ${name} n'était pas l'imposteur.`])),
+  undWinCivils: () => pick([`Les citoyens gagnent ! L'imposteur n'a pas tenu le coup.`, `Victoire de l'équipe ! L'intrus a été démasqué.`]),
+  undWinImpostor: (names) => pick([`L'imposteur gagne ! Bravo ${names}, quel bluff !`, `${names} vous a tous bernés ! Victoire de l'imposteur !`]),
+
+  // ----- Mot mystère -----
+  penduIntro: () => pick([
+    `Le Mot mystère ! Proposez des lettres sur vos téléphones. Une bonne lettre rapporte des points, mais attention aux erreurs !`,
+    `Mot mystère ! Lettre par lettre… ou tentez le mot entier si vous êtes sûrs de vous !`,
+  ]),
+  penduWord: (hint) => pick([`Indice : ${hint}. À vos lettres !`, `Nouveau mot ! Petit indice : ${hint}.`]),
+  penduSolved: (name) => pick([`${name} a trouvé le mot ! Bravo !`, `Et c'est ${name} qui craque le code !`]),
+  penduLost: () => pick([`Perdu ! Le mot vous a échappé.`, `Trop d'erreurs ! Le mot mystère reste un mystère.`]),
+
+  // ----- L'Estimation -----
+  estIntro: () => pick([
+    `L'Estimation ! Tapez un nombre, le plus proche gagne. Et si vous tombez pile, c'est le jackpot !`,
+    `Place à l'Estimation ! Pas besoin de savoir, il faut juste viser juste.`,
+  ]),
+  estAsk: (i, total) => (i === total ? `Dernière estimation ! Tout se joue maintenant.` : `Estimation ${i} sur ${total} !`),
+  estExact: (name) => pick([`PILE ! ${name} a trouvé la réponse exacte ! Incroyable !`, `${name} tombe pile dessus ! Jackpot !`]),
+  estClosest: (name) => pick([`${name} vise le plus juste !`, `Le meilleur tir, c'est ${name} !`]),
+
   finalIntro: () => pick([
     `Le moment tant attendu… La Grande Finale ! Roulement de tambour…`,
     `Mesdames et messieurs, voici le classement final. Le suspense est insoutenable !`,

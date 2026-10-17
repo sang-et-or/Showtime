@@ -1,5 +1,6 @@
-﻿// Test de bout en bout : lance le serveur, crée un salon, fait jouer 4 robots une partie complète
-// (écriture secrète → quiz → « Qui a osé dire ça ? » → finale), teste la reconnexion et la sécurité de base.
+﻿// Test de bout en bout : lance le serveur, crée un salon, fait jouer 4 robots un Grand Show complet
+// (quiz, Qui a osé dire ça ?, Défi Surprise, Grand Duel) puis chaque partie rapide,
+// et vérifie la reconnexion, la sécurité de base et la cohérence des scores.
 // Usage : npm test
 
 const { spawn } = require('child_process');
@@ -11,6 +12,9 @@ const PORT = 3999;
 const URL = `http://localhost:${PORT}`;
 const assert = (cond, msg) => { if (!cond) throw new Error(`ÉCHEC : ${msg}`); console.log(`  ✓ ${msg}`); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Phases où l'on attend les joueurs : l'hôte n'appuie pas sur « Suivant » pendant celles-ci.
+const INPUT = new Set(['writing', 'quizQuestion', 'whoVote', 'defiGet', 'defiAct', 'defiVote', 'duelBet', 'duelQ',
+  'bacWrite', 'bacReview', 'undVote', 'penduPlay', 'estAsk']);
 
 async function main() {
   const server = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env: { ...process.env, PORT: String(PORT) }, stdio: 'ignore' });
@@ -41,8 +45,9 @@ async function main() {
     const dup = await new Promise((r) => { const s = io(URL, { transports: ['websocket'], forceNew: true }); s.emit('player:join', { code: created.code, name: bots[0].name, avatar: '🤖' }, (res) => { s.close(); r(res); }); });
     assert(dup.error, 'prénom en double refusé');
 
-    host.emit('host:action', { type: 'settings', settings: { ...hs.settings, quizCount: 5 } });
+    host.emit('host:action', { type: 'settings', settings: { ...hs.settings, length: 'short' } });
     await sleep(100);
+    phases.length = 0;
     host.emit('host:action', { type: 'start' });
 
     // Reconnexion : un joueur perd sa connexion en pleine partie puis revient avec son jeton.
@@ -56,19 +61,35 @@ async function main() {
     assert(hs.players.find((p) => p.id === victim.id).connected === true && victim.state.me.id === victim.id, 'le joueur reprend sa place après reconnexion');
 
     // L'hôte accélère le show en appuyant sur « Suivant » dès que possible.
-    const t0 = Date.now();
-    while (hs.phase !== 'final' && Date.now() - t0 < 120_000) {
-      if (hs.canSkip && !['writing', 'quizQuestion', 'whoVote'].includes(hs.phase)) host.emit('host:action', { type: 'skip' });
-      await sleep(350);
-    }
-    assert(hs.phase === 'final', `partie terminée en ${Math.round((Date.now() - t0) / 1000)} s`);
-    for (const p of ['writing', 'roundIntro', 'quizQuestion', 'quizReveal', 'leaderboard', 'whoVote', 'whoReveal', 'final']) {
-      assert(phases.includes(p), `phase « ${p} » jouée`);
-    }
-    const total = hs.ranking.reduce((a, r) => a + r.score, 0);
-    assert(hs.ranking.length === 4 && total > 0, `classement final : ${hs.ranking.map((r) => `${r.rank}. ${r.name} ${r.score}`).join(' | ')}`);
-    assert(bots.every((b) => b.state.phase === 'final' && b.state.me.score === hs.ranking.find((r) => r.id === b.id).score), 'scores identiques sur chaque téléphone et sur l’écran');
+    const playUntilFinal = async (label) => {
+      const t0 = Date.now();
+      while (hs.phase !== 'final' && Date.now() - t0 < 240_000) {
+        if (hs.canSkip && !INPUT.has(hs.phase)) host.emit('host:action', { type: 'skip' });
+        await sleep(250);
+      }
+      assert(hs.phase === 'final', `${label} : partie terminée en ${Math.round((Date.now() - t0) / 1000)} s`);
+      await sleep(300);
+      assert(bots.every((b) => b.state.phase === 'final' && b.state.me.score === hs.ranking.find((r) => r.id === b.id).score), `${label} : scores identiques sur les téléphones et l’écran (${hs.ranking.map((r) => `${r.name} ${r.score}`).join(', ')})`);
+      return [...phases];
+    };
 
+    const showPhases = await playUntilFinal('Grand Show');
+    for (const p of ['writing', 'quizQuestion', 'quizReveal', 'leaderboard', 'whoVote', 'whoReveal', 'defiGet', 'defiAct', 'defiReveal', 'duelBet', 'duelQ', 'duelPoint', 'duelEnd']) {
+      assert(showPhases.includes(p), `Grand Show : phase « ${p} » jouée`);
+    }
+
+    const QUICK = { petitbac: ['bacWrite', 'bacReview', 'bacReveal'], undercover: ['undClues', 'undVote', 'undReveal', 'undEnd'], pendu: ['penduPlay', 'penduReveal'], estimation: ['estAsk', 'estReveal'] };
+    for (const [game, expected] of Object.entries(QUICK)) {
+      host.emit('host:action', { type: 'restart' });
+      await sleep(200);
+      host.emit('host:action', { type: 'settings', settings: { format: 'quick', game, length: 'short' } });
+      await sleep(200);
+      phases.length = 0;
+    host.emit('host:action', { type: 'start' });
+      const ph = await playUntilFinal(`Partie rapide ${game}`);
+      assert(expected.every((p) => ph.includes(p)), `Partie rapide ${game} : toutes les phases jouées`);
+      assert(hs.ranking.some((r) => r.score > 0), `Partie rapide ${game} : des points ont été marqués`);
+    }
     host.emit('host:action', { type: 'restart' });
     await sleep(300);
     assert(hs.phase === 'lobby' && hs.players.every((p) => p.score === 0), '« Rejouer » remet les scores à zéro');

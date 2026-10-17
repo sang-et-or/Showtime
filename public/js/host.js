@@ -114,7 +114,8 @@ function showLine(line) {
 // ---------------------------------------------------------------------------
 // Minuteur
 // ---------------------------------------------------------------------------
-const TIMED = new Set(['writing', 'quizQuestion', 'whoVote']);
+// Pas de tic-tac pendant les phases d'écriture ou de discussion (trop stressant).
+const NO_TICK = new Set(['writing', 'bacWrite', 'undClues', 'defiGet']);
 const CIRC = 276.5;
 const countdown = makeCountdown((left, total, sec, changed) => {
   const t = $('#timer');
@@ -123,31 +124,26 @@ const countdown = makeCountdown((left, total, sec, changed) => {
   $('#timer-bar').setAttribute('stroke-dashoffset', String(CIRC * (1 - left / total)));
   $('#timer-num').textContent = sec;
   t.classList.toggle('hurry', sec <= 5);
-  if (changed && sec <= 5 && sec > 0 && state && state.phase !== 'writing') (sec % 2 ? SFX.tick : SFX.tock)();
+  if (changed && sec <= 5 && sec > 0 && state && !NO_TICK.has(state.phase)) (sec % 2 ? SFX.tick : SFX.tock)();
 });
 
 // ---------------------------------------------------------------------------
 // Rendu principal
 // ---------------------------------------------------------------------------
-function keyOf(s) {
-  if (s.phase === 'quizQuestion' || s.phase === 'quizReveal') return `${s.phase}:${s.q.index}`;
-  if (s.phase === 'whoVote' || s.phase === 'whoReveal') return `${s.phase}:${s.who.index}`;
-  if (s.phase === 'roundIntro') return `${s.phase}:${s.round.round}`;
-  if (s.phase === 'leaderboard') return `${s.phase}:${s.title}`;
-  return s.phase;
-}
+const PHASE_LABEL = { lobby: 'Salon d’attente', writing: 'Préparation', leaderboard: 'Classement', final: 'La Grande Finale' };
 
-const ROUND_LABEL = {
-  lobby: 'Salon d’attente', writing: 'Préparation', quizQuestion: 'Manche 1 · Le Grand Quiz', quizReveal: 'Manche 1 · Le Grand Quiz',
-  leaderboard: 'Classement', whoVote: 'Manche 2 · Qui a osé dire ça ?', whoReveal: 'Manche 2 · Qui a osé dire ça ?', final: 'La Grande Finale',
-};
+function roundLabel(s) {
+  if (PHASE_LABEL[s.phase]) return PHASE_LABEL[s.phase];
+  if (s.phase === 'roundIntro') return s.round.quick ? 'Partie rapide' : `Manche ${s.round.num}`;
+  return s.game ? `${s.game.icon} ${s.game.title}` : '';
+}
 
 function render(s) {
   const prev = state;
   state = s;
   $('#code-pill').hidden = false;
   $('#code-txt').textContent = s.code;
-  $('#round-label').textContent = s.phase === 'roundIntro' ? `Manche ${s.round.num}` : ROUND_LABEL[s.phase] || '';
+  $('#round-label').textContent = roundLabel(s);
   $('#btn-skip').hidden = !s.canSkip || s.phase === 'lobby';
   $('#btn-end').hidden = ['lobby', 'final'].includes(s.phase);
 
@@ -156,9 +152,8 @@ function render(s) {
   if (prev && [...ids].some((id) => !knownPlayers.has(id))) SFX.pop();
   knownPlayers = ids;
 
-  const key = keyOf(s);
-  if (key !== viewKey) {
-    viewKey = key;
+  if (s.key !== viewKey) {
+    viewKey = s.key;
     clearLater();
     const builder = VIEWS[s.phase] || VIEWS.lobby;
     const root = h('div', { class: 'view' });
@@ -167,7 +162,7 @@ function render(s) {
     view = builder(root, s) || {};
   }
   if (view.update) view.update(s, prev);
-  countdown.set(TIMED.has(s.phase) ? s.remainingMs : 0, TIMED.has(s.phase) ? s.totalMs : 0);
+  countdown.set(s.timer ? s.remainingMs : 0, s.timer ? s.totalMs : 0);
   showLine(s.line);
 }
 
@@ -219,26 +214,46 @@ const VIEWS = {
         }
 
         const se = st.settings;
+        const cat = st.catalog;
+        const online = st.players.filter((p) => p.connected).length;
+        const formatCard = (id, icon, title, desc) => h('button', {
+          class: `format-card${se.format === id ? ' on' : ''}`, 'aria-pressed': String(se.format === id), onclick: () => send({ format: id }),
+        }, h('span', { class: 'fi', text: icon }), h('b', { text: title }), h('small', { text: desc }));
+        const gameCard = (g) => h('button', {
+          class: `game-card${se.game === g.id ? ' on' : ''}`, 'aria-pressed': String(se.game === g.id), onclick: () => send({ game: g.id }),
+        }, h('span', { class: 'fi', text: g.icon }), h('b', { text: g.title }), h('small', { text: g.pitch }),
+        g.min > 1 ? h('em', { class: online < g.min ? 'warn' : '', text: `${g.min} joueurs min.` }) : '');
+        const usesQuiz = se.format === 'show' && (se.rounds.quiz || se.rounds.duel);
+
         settings.replaceChildren(
-          h('h3', { text: '🎛️ Réglages du show' }),
-          h('div', { class: 'row' }, h('span', { text: 'Mode' }),
-            chip('🛋️ Même pièce', se.mode === 'local', () => send({ mode: 'local' })),
-            chip('🌍 À distance', se.mode === 'remote', () => send({ mode: 'remote' }))),
-          h('div', { class: 'row' }, h('span', { text: 'Questions du quiz' }),
-            ...[5, 8, 12].map((n) => chip(String(n), se.quizCount === n, () => send({ quizCount: n })))),
-          h('div', { class: 'row' }, h('span', { text: 'Thèmes' }),
+          h('h3', { text: '🎛️ Programme de la soirée' }),
+          h('div', { class: 'format-row' },
+            formatCard('show', '🎬', 'Le Grand Show', 'Plusieurs manches et un podium final'),
+            formatCard('quick', '⚡', 'Partie rapide', 'Un seul jeu, 5 à 15 minutes')),
+          se.format === 'show'
+            ? h('div', { class: 'row' }, h('span', { text: 'Manches' }),
+              ...cat.show.map((r) => chip(`${r.icon} ${r.title}`, se.rounds[r.id], () => send({ rounds: { ...se.rounds, [r.id]: !se.rounds[r.id] } }))))
+            : h('div', { class: 'game-grid' }, ...cat.quick.map(gameCard)),
+          usesQuiz ? h('div', { class: 'row' }, h('span', { text: 'Thèmes du quiz' }),
             ...Object.entries(st.categories).map(([k, c]) => chip(`${c.icon} ${c.label}`, se.categories.includes(k), () => {
               const cats = se.categories.includes(k) ? se.categories.filter((x) => x !== k) : [...se.categories, k];
               if (cats.length) send({ categories: cats });
-            }))),
-          h('div', { class: 'row' }, h('span', { text: 'Manche 2' }),
-            chip('🤫 Qui a osé dire ça ?', se.whoSaid, () => send({ whoSaid: !se.whoSaid }))),
+            }))) : '',
+          h('div', { class: 'row' }, h('span', { text: 'Durée' }),
+            chip('Courte', se.length === 'short', () => send({ length: 'short' })),
+            chip('Normale', se.length === 'normal', () => send({ length: 'normal' })),
+            chip('Longue', se.length === 'long', () => send({ length: 'long' }))),
+          h('div', { class: 'row' }, h('span', { text: 'Mode' }),
+            chip('🛋️ Même pièce', se.mode === 'local', () => send({ mode: 'local' })),
+            chip('🌍 À distance', se.mode === 'remote', () => send({ mode: 'remote' }))),
         );
 
-        const online = st.players.filter((p) => p.connected).length;
+        const needed = se.format === 'quick' ? (cat.quick.find((g) => g.id === se.game)?.min || 1) : 1;
         startBtn.disabled = online < 1;
         hint.textContent = online < 1 ? 'Il faut au moins une star pour commencer.'
-          : online < 3 ? 'Astuce : c’est plus drôle à partir de 3 joueurs !' : 'Tout le monde est là ? C’est parti !';
+          : online < needed ? `Ce jeu se joue à ${needed} minimum : attendez encore ${needed - online} star(s).`
+            : online < 3 ? 'Astuce : c’est plus drôle à partir de 3 joueurs !' : 'Tout le monde est là ? C’est parti !';
+        if (online < needed) startBtn.disabled = true;
 
         if (st.settings.mode === 'remote') {
           remoteTip.classList.remove('hidden');
@@ -275,9 +290,9 @@ const VIEWS = {
 
   roundIntro(root, s) {
     SFX.whoosh();
-    later(400, SFX.fanfare);
-    root.append(h('div', { class: 'round-intro' },
-      h('div', { class: 'num', text: `MANCHE ${s.round.num}` }),
+    if (s.round.cancelled) later(400, SFX.wrong); else later(400, SFX.fanfare);
+    root.append(h('div', { class: `round-intro${s.round.cancelled ? ' cancelled' : ''}` },
+      h('div', { class: 'num', text: s.round.quick ? 'PARTIE RAPIDE' : `MANCHE ${s.round.num}` }),
       h('div', { class: 'icon', text: s.round.icon }),
       h('h1', { text: s.round.title }),
       h('p', { text: s.round.subtitle })));

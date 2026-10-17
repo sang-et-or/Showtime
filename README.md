@@ -3,12 +3,19 @@
 Jeu télévisé interactif pour soirées, jouable dans le navigateur, sans application.
 Un écran (ordinateur ou télé) sert de **plateau**, les **smartphones** servent de buzzers.
 
-**Contenu de ce prototype (V1) :**
-accueil · création de salon avec QR code et code à 4 lettres · prénoms et avatars ·
-écriture secrète · **Grand Quiz** (près de 50 questions, 5 thèmes, bonus de rapidité et de série) ·
-**Qui a osé dire ça ?** · classements animés · **Grande Finale** avec compte à rebours, podium et confettis ·
-animateur virtuel « Max Paillettes » (textes + voix de synthèse) · bruitages synthétisés ·
-mode même pièce et mode à distance · reconnexion automatique des joueurs.
+Dans le salon, l'hôte choisit son programme :
+
+| 🎬 **Le Grand Show** (plusieurs manches, podium final) | ⚡ **Partie rapide** (un seul jeu, 5 à 15 min) |
+| --- | --- |
+| 🧠 **Le Grand Quiz** : 4 réponses, bonus de rapidité et de série | 📝 **Le Petit Bac** : une lettre, 5 catégories, « STOP ! », contestation des réponses |
+| 🤫 **Qui a osé dire ça ?** : réponses secrètes, devinez l'auteur | 🕵️ **L'Imposteur** : un mot secret pour tous sauf un, indices et votes (3 joueurs min.) |
+| 🎭 **Défi Surprise** : mimes à faire deviner, défis notés par le public | 🔤 **Le Mot mystère** : pendu collectif, lettres et mot entier |
+| ⚔️ **Le Grand Duel** : face-à-face, le public mise des points virtuels | 🎯 **L'Estimation** : un nombre, le plus proche gagne |
+
+Et partout : QR code et code à 4 lettres, prénoms et avatars, classements animés, **Grande Finale**
+avec compte à rebours, podium et confettis, animateur virtuel « Max Paillettes » (textes + voix),
+bruitages synthétisés, durée Courte / Normale / Longue, mode même pièce ou à distance,
+reconnexion automatique des joueurs.
 
 ---
 
@@ -115,13 +122,14 @@ Facile à comprendre, à modifier et à héberger pour quelques euros.
                   │   ├─ salons en mémoire (Map)          │
                   │   ├─ /api/join-info → QR code (SVG)   │
                   │   └─ limitation de débit, nettoyage   │
-                  │ server/room.js   machine à états      │
-                  │   lobby → writing → roundIntro →      │
-                  │   quizQuestion ⇄ quizReveal →         │
-                  │   leaderboard → whoVote ⇄ whoReveal → │
-                  │   final                               │
+                  │ server/room.js   salon : joueurs,     │
+                  │   minuteur, programme, classements,   │
+                  │   finale. Lobby → jeu 1 → classement  │
+                  │   → jeu 2 → … → podium                │
+                  │ server/rounds/   un module par jeu    │
+                  │   (ses phases, ses règles, ses vues)  │
                   │ server/animator.js  répliques de Max  │
-                  │ server/content/     questions, amorces│
+                  │ server/content/  questions, mots…     │
                   └──────────────────────────────────────┘
 ```
 
@@ -134,19 +142,25 @@ et reconnexion triviale (on renvoie simplement l'état courant).
 | Fichier | Rôle |
 | --- | --- |
 | `server/index.js` | serveur HTTP, Socket.IO, QR code, codes de salon, sécurité, nettoyage des salons |
-| `server/room.js` | règles du jeu : phases, minuteurs, calcul des points, vues hôte/joueur |
+| `server/room.js` | le salon : joueurs, minuteur, enchaînement des jeux, classements, finale |
+| `server/rounds/` | un fichier par jeu (`quiz.js`, `whosaid.js`, `defi.js`, `duel.js`, `petitbac.js`, `undercover.js`, `pendu.js`, `estimation.js`) ; `index.js` en fait le catalogue |
 | `server/animator.js` | toutes les phrases de l'animateur (remplaçable par une IA plus tard) |
-| `server/content/questions.js` | banque de questions du quiz (bonne réponse en premier) |
-| `server/content/prompts.js` | amorces de « Qui a osé dire ça ? » |
+| `server/content/` | contenus : questions du quiz, amorces, mimes et défis, catégories du Petit Bac, paires de mots, mots mystères, estimations |
 | `public/index.html` | page d'accueil |
-| `public/host.html`, `js/host.js` | plateau TV : animations, minuteur, classement, podium, voix |
-| `public/play.html`, `js/play.js` | manette smartphone |
+| `public/host.html`, `js/host.js`, `js/host-games.js` | plateau TV : animations, minuteur, classement, podium, voix, écrans de chaque jeu |
+| `public/play.html`, `js/play.js`, `js/play-games.js` | manette smartphone, écrans de chaque jeu |
 | `public/js/common.js` | bruitages synthétisés (Web Audio), voix (Web Speech), confettis |
 | `scripts/bots.js`, `scripts/e2e.js` | robots joueurs et test de bout en bout |
 
 **Barème actuel :**
-Quiz : 500 à 1 000 points selon la rapidité, +100 par bonne réponse consécutive (max +300).
-Qui a osé dire ça ? : +500 pour qui démasque l'auteur, +200 pour l'auteur par joueur berné.
+- Quiz : 500 à 1 000 points selon la rapidité, +100 par bonne réponse consécutive (max +300).
+- Qui a osé dire ça ? : +500 pour qui démasque l'auteur, +200 pour l'auteur par joueur berné.
+- Défi Surprise : mime trouvé = +400 pour le mime et +400 pour qui trouve ; défi = 150 points par étoile de moyenne.
+- Grand Duel : +600 au vainqueur ; les parieurs gagnent ou perdent leur mise (100, 300 ou 500 points virtuels).
+- Petit Bac : 100 par réponse valide et unique, 50 si un autre joueur a la même ; refusée si la majorité conteste.
+- L'Imposteur : +500 à chaque citoyen si l'imposteur est démasqué, +1 200 à l'imposteur s'il survit.
+- Mot mystère : +50 par lettre trouvée (par occurrence), +300 pour le mot complet (+50 par lettre encore cachée).
+- L'Estimation : 500 / 300 / 150 pour les trois plus proches, 1 000 pour une réponse exacte.
 
 **Sécurité et données personnelles (minimum raisonnable pour un prototype) :**
 aucun compte, aucun cookie de suivi, aucune base de données ; prénoms et réponses vivent en mémoire
@@ -161,9 +175,10 @@ toutes les saisies nettoyées et bornées, affichage sans injection HTML, limita
 
 | Étape | Contenu | État |
 | --- | --- | --- |
-| **V1 – Prototype jouable** | salon + QR, avatars, Grand Quiz, Qui a osé dire ça ?, classements, Grande Finale, animateur texte + voix, mode distant, reconnexion | ✅ ce livrable |
-| **V1.1 – Retours de vos tests** | ajuster durées, barème, textes de Max ; enrichir les questions (viser 300+) ; page « règles » | à faire après vos soirées test |
-| **V2 – Les 5 manches** | **Défi Surprise** (mimes et défis chronométrés, votes du public) ; **Grand Duel** (2 joueurs en face-à-face, les autres misent des points virtuels) ; **Grande Finale** avec une épreuve dédiée avant le podium ; choix des manches au salon | conception prête : chaque manche = de nouvelles phases dans `room.js` + vues hôte/joueur |
+| **V1 – Prototype jouable** | salon + QR, avatars, Grand Quiz, Qui a osé dire ça ?, classements, Grande Finale, animateur texte + voix, mode distant, reconnexion | ✅ fait |
+| **Vague 1 – Plus de jeux** | menu Grand Show / Partie rapide ; **Défi Surprise**, **Grand Duel** ; parties rapides **Petit Bac**, **L'Imposteur**, **Mot mystère**, **L'Estimation** ; réglage de durée | ✅ fait |
+| **Vague 2 – Jeux de plateau** | Petits chevaux ; quiz à camemberts (inspiré de Trivial Pursuit, sous un autre nom) ; parcours de vie (inspiré de Destin) ; jeu du mois (inspiré de La Bonne Paye) | à venir |
+| **Vague 3 – Contenu et finitions** | centaines de questions avec niveaux, nouveaux thèmes, animateur plus personnalisé, épreuve dédiée de Grande Finale, règles réglables | à venir |
 | **V3 – Version commerciale** | découverte gratuite ≈ 15 min puis **Soirée premium à 4,99 €** via Stripe Checkout (paiement côté hôte uniquement, webhook qui « débloque » le salon) ; packs de questions thématiques ; personnalisation (nom de l'équipe, questions perso) ; base de données légère (SQLite/Postgres) pour les achats ; Redis si plusieurs serveurs | à démarrer quand le jeu plaît |
 | **V4 – Animateur augmenté** | voix plus naturelles (TTS en ligne), répliques générées par IA à partir du contexte de la partie, avatar animé | l'animateur est déjà isolé dans `animator.js` et `Voice.speak()` |
 
@@ -178,7 +193,10 @@ et la machine à états centralise les transitions ; il suffira d'y vérifier un
   (l'ordre est mélangé automatiquement à chaque partie).
 - **Ajouter des amorces** pour « Qui a osé dire ça ? » : `server/content/prompts.js`.
 - **Changer les répliques de l'animateur** : `server/animator.js`.
-- **Durées** (temps de réponse, révélations…) : constante `DURATIONS` en haut de `server/room.js`.
+- **Mimes, défis, mots, catégories, estimations** : les autres fichiers de `server/content/`.
+- **Durées et barèmes** : constantes en haut de chaque fichier de `server/rounds/` (ex. `QUESTION_MS`, `WIN_POINTS`).
+- **Ajouter un jeu** : créer un module dans `server/rounds/` sur le modèle de `quiz.js`, l'ajouter au catalogue
+  `server/rounds/index.js`, puis ses écrans dans `public/js/host-games.js` et `public/js/play-games.js`.
 
 Après une modification, relancez `npm start` (ou utilisez `npm run dev`, qui redémarre tout seul).
 

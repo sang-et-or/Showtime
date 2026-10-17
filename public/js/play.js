@@ -104,19 +104,15 @@ const timer = makeCountdown((left, total) => {
   if (bar) bar.style.transform = `scaleX(${total ? left / total : 0})`;
 });
 
+/** Clé de la vue : fournie par le serveur, complétée par les réponses tapées mais pas encore confirmées. */
 function keyOf(s) {
-  switch (s.phase) {
-    case 'writing': return `writing:${s.submitted}`;
-    case 'roundIntro': return `roundIntro:${s.round.round}`;
-    case 'quizQuestion': return `q:${s.q.index}:${s.myAnswer != null || localAnswer === s.q.index}`;
-    case 'quizReveal': return `qr:${s.q.index}`;
-    case 'leaderboard': return `lb:${s.title}`;
-    case 'whoVote': return `wv:${s.who.index}:${!!s.myVote || localVote === s.who.index}`;
-    case 'whoReveal': return `wr:${s.who.index}`;
-    default: return s.phase;
-  }
+  if (s.phase === 'quizQuestion' && localAnswer === s.q.index) return `quizQuestion:${s.q.index}:true`;
+  if (s.phase === 'whoVote' && localVote === s.who.index) return `whoVote:${s.who.index}:true`;
+  return s.key;
 }
 
+/** Envoie une action de jeu au serveur. */
+const act = (msg) => socket.emit('player:act', msg);
 function render(s) {
   state = s;
   $('#me-bar').classList.remove('hidden');
@@ -132,8 +128,7 @@ function render(s) {
     setView(root);
   }
   if (view.update) view.update(s);
-  const timed = ['writing', 'quizQuestion', 'whoVote'].includes(s.phase);
-  timer.set(timed ? s.remainingMs : 0, timed ? s.totalMs : 0);
+  timer.set(s.timer ? s.remainingMs : 0, s.timer ? s.totalMs : 0);
 }
 
 const timerBar = () => h('div', { class: 'p-timer' }, h('i', { id: 'ptimer' }));
@@ -172,7 +167,7 @@ const PVIEWS = {
       e.preventDefault();
       const answers = fields.map((f) => f.ta.value.trim());
       if (answers.every((a) => !a)) { err.textContent = 'Écris au moins une réponse !'; err.classList.remove('hidden'); return; }
-      socket.emit('player:write', { answers });
+      act({ type: 'write', answers });
       SFX.blip(); buzz(40);
     });
     root.append(form);
@@ -181,7 +176,7 @@ const PVIEWS = {
 
   roundIntro(root, s) {
     buzz([80, 60, 80]);
-    center(root).append(h('div', { style: 'color:var(--cyan);font-family:var(--display);letter-spacing:.2em', text: `MANCHE ${s.round.num}` }),
+    center(root).append(h('div', { style: 'color:var(--cyan);font-family:var(--display);letter-spacing:.2em', text: s.round.quick ? 'PARTIE RAPIDE' : `MANCHE ${s.round.num}` }),
       h('div', { class: 'big-emoji pop', text: s.round.icon }), h('h1', { text: s.round.title }), h('p', { text: s.round.subtitle }));
   },
 
@@ -201,7 +196,7 @@ const PVIEWS = {
         class: `p-btn c${i}`, 'aria-label': `Réponse ${SHAPES[i]} : ${c}`,
         onclick: () => {
           localAnswer = s.q.index; localChoice = i;
-          socket.emit('player:answer', { choice: i });
+          act({ type: 'answer', choice: i });
           SFX.tap(); buzz(50);
           render(state);
         },
@@ -251,7 +246,7 @@ const PVIEWS = {
       h('h2', { text: 'Qui a osé dire ça ?' }),
       h('div', { class: 'cand-grid' }, ...s.candidates.map((c) => h('button', {
         class: 'cand', 'aria-label': `Voter pour ${c.name}`,
-        onclick: () => { localVote = s.who.index; socket.emit('player:vote', { target: c.id }); SFX.tap(); buzz(50); render(state); },
+        onclick: () => { localVote = s.who.index; act({ type: 'vote', target: c.id }); SFX.tap(); buzz(50); render(state); },
       }, avatarEl(c), h('span', { class: 'nm', text: c.name })))));
     return null;
   },

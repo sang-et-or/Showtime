@@ -1,0 +1,31 @@
+﻿// Questions de « L'Estimation » : une réponse chiffrée, le plus proche gagne.
+// Valeurs choisies pour être stables dans le temps (dates, mesures connues).
+
+module.exports = [
+  { q: 'En quelle année a eu lieu la prise de la Bastille ?', a: 1789, unit: '' },
+  { q: 'En quelle année le mur de Berlin est-il tombé ?', a: 1989, unit: '' },
+  { q: 'En quelle année est sorti le tout premier iPhone ?', a: 2007, unit: '' },
+  { q: 'En quelle année a eu lieu le premier Tour de France ?', a: 1903, unit: '' },
+  { q: 'En quelle année s’est jouée la première Coupe du monde de football ?', a: 1930, unit: '' },
+  { q: 'En quelle année est né Molière ?', a: 1622, unit: '' },
+  { q: 'En quelle année a été fondé le RC Lens ?', a: 1906, unit: '' },
+  { q: 'Quelle est la hauteur de la tour Eiffel, antennes comprises ?', a: 330, unit: 'm' },
+  { q: 'Quelle est l’altitude de l’Everest ?', a: 8849, unit: 'm' },
+  { q: 'Quelle est la distance moyenne entre la Terre et la Lune ?', a: 384400, unit: 'km' },
+  { q: 'Combien mesure le tour de la Terre à l’équateur ?', a: 40075, unit: 'km' },
+  { q: 'Combien de cases compte un échiquier ?', a: 64, unit: 'cases' },
+  { q: 'Combien de dents a un adulte (dents de sagesse comprises) ?', a: 32, unit: 'dents' },
+  { q: 'Combien de départements compte la France (outre-mer compris) ?', a: 101, unit: 'départements' },
+  { q: 'Combien de minutes y a-t-il dans une semaine ?', a: 10080, unit: 'minutes' },
+  { q: 'Combien de jours dure une année bissextile ?', a: 366, unit: 'jours' },
+  { q: 'Combien de pays font partie de l’Union européenne ?', a: 27, unit: 'pays' },
+  { q: 'Combien de cartes compte un jeu de tarot ?', a: 78, unit: 'cartes' },
+  { q: 'Combien de touches compte le clavier d’un piano standard ?', a: 88, unit: 'touches' },
+  { q: 'À quelle température (°C) l’eau gèle-t-elle ?', a: 0, unit: '°C' },
+  { q: 'Combien d’os compte le squelette d’un adulte ?', a: 206, unit: 'os' },
+  { q: 'Combien de joueurs au total sur un terrain de rugby à XV (les deux équipes) ?', a: 30, unit: 'joueurs' },
+  { q: 'Combien de secondes y a-t-il dans une heure ?', a: 3600, unit: 'secondes' },
+  { q: 'Combien de cartes compte un jeu de belote ?', a: 32, unit: 'cartes' },
+  { q: 'Combien de kilomètres mesure un marathon (arrondi à l’unité) ?', a: 42, unit: 'km' },
+  { q: 'Combien d’équipes ont participé à la Coupe du monde de football 2022 ?', a: 32, unit: 'équipes' },
+];
