@@ -21,7 +21,7 @@ const methods = {
 
   /** Enregistre les joueurs et leurs scores (avec leur compte s'ils sont connectés). */
   saveParticipants(ranking) {
-    if (!this.soireePromise) return;
+    if (!this.soireePromise || this.isPrivate()) return;
     const ranks = new Map((ranking || this.ranking()).map((r) => [r.id, r.rank]));
     bg(this.soireePromise.then((sid) => Promise.all([...this.players.values()].map((p) => store.upsertParticipant(sid, {
       pkey: p.id, userId: p.userId || null, name: p.name, avatar: p.avatar, score: p.score, rank: ranks.get(p.id) ?? null,
@@ -38,7 +38,7 @@ const methods = {
 
   /** Fin d'un jeu : résumé de la partie, classement et souvenirs. */
   memorizeGame(mod) {
-    if (!mod || mod.prep) return;
+    if (!mod || mod.prep || mod.privateGame) { this.highlights = {}; return; }
     const ranking = this.ranking();
     const hl = this.highlights || {};
     this.highlights = {};
@@ -53,7 +53,7 @@ const methods = {
 
   /** Podium final : une carte souvenir et le classement définitif. */
   memorizeFinal(ranking) {
-    if (!ranking.length) return;
+    if (!ranking.length || this.isPrivate()) return;
     const top = ranking.slice(0, 3).map((r) => ({ name: r.name, avatar: r.avatar, color: r.color, score: r.score, rank: r.rank }));
     const games = (this.program || []).map((id) => this.gameTitle(id)).filter(Boolean);
     bg(this.ensureSoiree().then(async (sid) => {

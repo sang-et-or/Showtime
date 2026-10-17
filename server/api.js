@@ -1,4 +1,4 @@
-// API HTTP des comptes, de l'historique et des photos.
+﻿// API HTTP des comptes, de l'historique et des photos.
 // Sécurité : mots de passe hachés (scrypt + sel), sessions par cookie HttpOnly (jeton aléatoire stocké haché),
 // limitation des tentatives de connexion, photos visibles uniquement par les joueurs de la soirée.
 const crypto = require('crypto');
@@ -9,6 +9,7 @@ const { sanitizeText } = require('./util');
 const COOKIE = 'st_session';
 const SESSION_DAYS = 60;
 const MAX_PHOTO = 2 * 1024 * 1024;
+const MAX_CAPTURES = 60; // images ajoutées par personne et par soirée
 const AVATAR_RE = /^[\p{Extended_Pictographic}\p{Emoji_Component}‍️]{1,8}$/u;
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 
@@ -141,6 +142,27 @@ function createApi({ rooms }) {
     res.json({ soiree: await store.soireeDetail(req.params.id), me: req.user.id });
   });
 
+  // ---------- répertoire : photos et captures d'écran ajoutées après la soirée ----------
+  api.get('/me/photos', needUser, async (req, res) => res.json({ photos: await store.photosOfUser(req.user.id), me: req.user.id }));
+
+  const lastCapture = new Map();
+  api.post('/me/soirees/:id/photos', express.raw({ type: 'image/jpeg', limit: MAX_PHOTO }), needUser, async (req, res) => {
+    const soireeId = req.params.id;
+    if (!/^[0-9a-f-]{36}$/.test(soireeId) || !(await store.isParticipant(soireeId, req.user.id))) return res.status(404).json({ error: 'Soirée introuvable.' });
+    const data = req.body;
+    if (!Buffer.isBuffer(data) || data.length < 100 || data[0] !== 0xff || data[1] !== 0xd8 || data[2] !== 0xff) return res.status(400).json({ error: 'Image invalide (JPEG attendu).' });
+    const now = Date.now();
+    if (now - (lastCapture.get(req.user.id) || 0) < 1500) return res.status(429).json({ error: 'Doucement ! Une image à la fois.' });
+    const detail = await store.soireeDetail(soireeId);
+    if (detail.photos.filter((p) => p.uploaderUserId === req.user.id).length >= MAX_CAPTURES) return res.status(429).json({ error: `Maximum ${MAX_CAPTURES} images par personne et par soirée.` });
+    lastCapture.set(req.user.id, now);
+    try {
+      const id = crypto.randomUUID();
+      await store.addPhoto({ id, soireeId, uploaderUserId: req.user.id, uploaderPkey: null, uploaderName: req.user.name, mime: 'image/jpeg', data });
+      res.json({ id });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Impossible d’enregistrer l’image.' }); }
+  });
+
   // ---------- photos ----------
   // Qui est l'appelant dans un salon en cours ? (hôte ou joueur, via des en-têtes, jamais dans l'URL)
   const roomCaller = (req) => {
@@ -156,7 +178,7 @@ function createApi({ rooms }) {
     const who = roomCaller(req);
     if (!who || !who.player) return res.status(403).json({ error: 'Seuls les joueurs du salon peuvent envoyer des photos.' });
     const { room, player } = who;
-    if (!room.settings.photos) return res.status(403).json({ error: 'L’hôte a désactivé les photos.' });
+    if (!room.settings.photos || room.isPrivate()) return res.status(403).json({ error: 'Les photos sont désactivées pour cette partie.' });
     const data = req.body;
     if (!Buffer.isBuffer(data) || data.length < 100 || data[0] !== 0xff || data[1] !== 0xd8 || data[2] !== 0xff) return res.status(400).json({ error: 'Image invalide (JPEG attendu).' });
     if (!room.canUploadPhoto(player.id)) return res.status(429).json({ error: 'Doucement ! Une photo toutes les 10 secondes.' });

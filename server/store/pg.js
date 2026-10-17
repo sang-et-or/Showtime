@@ -93,6 +93,11 @@ function createPgStore(url, PoolClass = Pool) {
       return r;
     },
     deletePhoto: (id) => pool.query('DELETE FROM photos WHERE id = $1', [id]),
+    /** Toutes les photos et captures des soirées auxquelles l'utilisateur a participé (les plus récentes d'abord). */
+    photosOfUser: (userId) => all(
+      `SELECT f.id, f.soiree_id AS "soireeId", s.code, s.started_at AS "startedAt", f.uploader_user_id AS "uploaderUserId", f.uploader_name AS "uploaderName", f.created_at AS "createdAt"
+       FROM photos f JOIN soirees s ON s.id = f.soiree_id
+       WHERE f.soiree_id IN (SELECT soiree_id FROM participants WHERE user_id = $1) ORDER BY f.created_at DESC LIMIT 500`, [userId]),
     linkPhotosOf: (soireeId, pkey, userId) => pool.query('UPDATE photos SET uploader_user_id = $3 WHERE soiree_id = $1 AND uploader_pkey = $2 AND uploader_user_id IS NULL', [soireeId, pkey, userId]),
   };
 }

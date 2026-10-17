@@ -124,6 +124,7 @@ $('#open-curtain').addEventListener('click', () => {
   if (state) setTimeout(() => speak(state.line.text), 900);
 });
 $('#btn-skip').addEventListener('click', () => action('skip'));
+$('#btn-pause').addEventListener('click', () => action('pause'));
 $('#btn-end').addEventListener('click', () => { if (confirm('Passer directement à la Grande Finale ?')) action('end'); });
 $('#btn-home').addEventListener('click', () => {
   if (confirm('Annuler la partie en cours et revenir au salon ?\nLes joueurs restent connectés : vous pourrez choisir un autre jeu.')) action('restart');
@@ -231,6 +232,8 @@ function render(s) {
   $('#btn-skip').hidden = !s.canSkip || s.phase === 'lobby';
   $('#btn-end').hidden = ['lobby', 'final'].includes(s.phase);
   $('#btn-home').hidden = s.phase === 'lobby';
+  $('#btn-pause').hidden = !s.canPause || !!s.paused;
+  PauseOverlay.set(s.paused, SPECTATE ? null : () => action('resume'));
 
   // Nouveaux arrivants : petit « pop » sonore.
   const ids = new Set(s.players.map((p) => p.id));
@@ -305,7 +308,7 @@ const VIEWS = {
         const se = st.settings;
         const cat = st.catalog;
         const online = st.players.filter((p) => p.connected).length;
-        const allGames = [...cat.quick, ...cat.board, ...cat.cards];
+        const allGames = [...cat.quick, ...cat.board, ...cat.cards, ...cat.adult];
         const game = allGames.find((g) => g.id === se.game) || allGames[0];
         const usesQuiz = se.format === 'show' ? (se.rounds.quiz || se.rounds.duel) : se.game === 'quiz';
         const changeBtn = h('button', { class: 'btn ghost', onclick: () => openPicker(st) }, '🔄 Changer de jeu');
@@ -319,7 +322,7 @@ const VIEWS = {
             changeBtn)
           : h('div', { class: 'prog-hero' },
             h('span', { class: 'prog-ic', text: game.icon }),
-            h('div', { class: 'prog-txt' }, h('small', { text: cat.board.some((g) => g.id === game.id) ? 'Jeu de plateau' : cat.cards.some((g) => g.id === game.id) ? 'Jeu de cartes' : 'Partie rapide' }), h('b', { text: game.title }),
+            h('div', { class: 'prog-txt' }, h('small', { text: cat.board.some((g) => g.id === game.id) ? 'Jeu de plateau' : cat.cards.some((g) => g.id === game.id) ? 'Jeu de cartes' : cat.adult.some((g) => g.id === game.id) ? '🔞 Jeu privé pour adultes' : 'Partie rapide' }), h('b', { text: game.title }),
               h('span', { text: game.rules }),
               h('em', { class: online < game.min ? 'warn' : '', text: `👥 ${game.players} · ⏱ ${game.duration}` })),
             changeBtn);
@@ -339,6 +342,8 @@ const VIEWS = {
             ? h('div', { class: 'row' }, ...cat.show.map((r) => chip(`${r.icon} ${r.title}`, se.rounds[r.id], () => send({ rounds: { ...se.rounds, [r.id]: !se.rounds[r.id] } }))))
             : '',
           usesQuiz ? themePicker(st, chip, send) : '',
+          se.format === 'quick' && se.game === 'couple' && !se.vote ? h('div', { class: 'row' }, h('span', { text: 'Niveau' }),
+            ...Object.entries(cat.coupleLevels).map(([k, l]) => chip(`${l.icon} ${l.label}`, se.coupleLevel === k, () => send({ coupleLevel: k })))) : '',
           h('div', { class: 'row' }, h('span', { text: 'Durée' }),
             chip('Courte', se.length === 'short', () => send({ length: 'short' })),
             chip('Normale', se.length === 'normal', () => send({ length: 'normal' })),
@@ -346,9 +351,10 @@ const VIEWS = {
           h('div', { class: 'row' }, h('span', { text: 'Choix du jeu' }),
             chip('🗳️ Vote des joueurs', se.vote, () => send({ vote: true })),
             chip('🎛️ Je choisis', !se.vote, () => send({ vote: false }))),
-          h('div', { class: 'row' }, h('span', { text: 'Photos' }),
-            chip('📸 Autorisées', se.photos, () => send({ photos: true })),
-            chip('🚫 Désactivées', !se.photos, () => send({ photos: false }))),
+          se.format === 'quick' && se.game === 'couple' && !se.vote ? h('div', { class: 'row' }, h('span', { text: 'Photos' }), h('small', { text: '🔒 Aucune photo ni historique pour ce jeu privé' }))
+            : h('div', { class: 'row' }, h('span', { text: 'Photos' }),
+              chip('📸 Autorisées', se.photos, () => send({ photos: true })),
+              chip('🚫 Désactivées', !se.photos, () => send({ photos: false }))),
           h('div', { class: 'row' }, h('span', { text: 'Joueurs' }),
             chip('🛋️ Même pièce', se.mode === 'local', () => send({ mode: 'local' })),
             chip('🌍 À distance', se.mode === 'remote', () => send({ mode: 'remote' }))),
@@ -607,7 +613,9 @@ function openPicker(st) {
   const cat = st.catalog;
   const close = () => overlay.remove();
   const pickIt = (patch) => { action('settings', { settings: { ...state.settings, ...patch } }); SFX.pop(); close(); };
-  const tile = (g) => h('button', { class: `tile${st.settings.format === 'quick' && st.settings.game === g.id ? ' on' : ''}`, onclick: () => pickIt({ format: 'quick', game: g.id }) },
+  const ADULT_OK = '🔞 Jeu privé réservé aux adultes consentants (2 joueurs). Rien n’est enregistré. Continuer ?';
+  const tile = (g, adult) => h('button', { class: `tile${adult ? ' adult-tile' : ''}${st.settings.format === 'quick' && st.settings.game === g.id ? ' on' : ''}`,
+    onclick: () => { if (!adult || confirm(ADULT_OK)) pickIt({ format: 'quick', game: g.id }); } },
     h('span', { class: 'tile-ic', text: g.icon }), h('b', { text: g.title }), h('span', { class: 'tile-pitch', text: g.pitch }),
     h('small', { class: 'tile-meta', text: `👥 ${g.players} · ⏱ ${g.duration}` }));
   const overlay = h('div', { class: 'picker-overlay', onclick: (e) => { if (e.target === overlay) close(); } },
@@ -616,9 +624,10 @@ function openPicker(st) {
       h('button', { class: `show-card${st.settings.format === 'show' ? ' on' : ''}`, onclick: () => pickIt({ format: 'show' }) },
         h('span', { class: 'show-ic', text: '🎬' }),
         h('span', { class: 'show-txt' }, h('b', { text: 'Le Grand Show' }), h('span', { text: 'Plusieurs manches et un podium final.' }))),
-      h('h3', { class: 'family', text: '⚡ Parties rapides' }), h('div', { class: 'tile-grid' }, ...cat.quick.map(tile)),
-      h('h3', { class: 'family', text: '🎲 Jeux de plateau' }), h('div', { class: 'tile-grid' }, ...cat.board.map(tile)),
-      h('h3', { class: 'family', text: '🃏 Jeux de cartes' }), h('div', { class: 'tile-grid' }, ...cat.cards.map(tile))));
+      h('h3', { class: 'family', text: '⚡ Parties rapides' }), h('div', { class: 'tile-grid' }, ...cat.quick.map((g) => tile(g))),
+      h('h3', { class: 'family', text: '🎲 Jeux de plateau' }), h('div', { class: 'tile-grid' }, ...cat.board.map((g) => tile(g))),
+      h('h3', { class: 'family', text: '🃏 Jeux de cartes' }), h('div', { class: 'tile-grid' }, ...cat.cards.map((g) => tile(g))),
+      h('h3', { class: 'family', text: '🔞 Pour adultes' }), h('div', { class: 'tile-grid' }, ...cat.adult.map((g) => tile(g, true)))));
   document.body.append(overlay);
 }
 function countUp(el, from, to, ms) {

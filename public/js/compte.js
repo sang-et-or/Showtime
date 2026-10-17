@@ -1,4 +1,4 @@
-// Page « Mon compte » : connexion / création de compte, historique des soirées, souvenirs et photos.
+﻿// Page « Mon compte » : connexion / création de compte, historique des soirées, souvenirs et photos.
 /* global $, h, AVATARS, toast */
 
 const params = new URLSearchParams(location.search);
@@ -88,31 +88,93 @@ async function showHistory() {
       h('span', { text: `👥 ${s.players}` }), h('span', { text: `✨ ${s.souvenirs}` }), h('span', { text: `📸 ${s.photos}` })))))
     : h('div', { class: 'account-card panel empty' }, h('div', { class: 'big-emoji', text: '🎬' }), h('b', { text: 'Pas encore de soirée' }),
       h('p', { class: 'muted', text: 'Rejoignez une partie en étant connecté : elle apparaîtra ici avec ses souvenirs et ses photos.' }));
-  app.replaceChildren(header(), profile, h('h2', { class: 'family', text: '📚 Mes soirées' }), list, dangerZone());
+  app.replaceChildren(header(), profile, dirTabs('soirees'), list, dangerZone());
+}
+
+/** Onglets du répertoire : les soirées, ou toutes les photos et captures. */
+const dirTabs = (on) => h('div', { class: 'tabs dir-tabs' },
+  h('button', { type: 'button', class: on === 'soirees' ? 'on' : '', onclick: () => showHistory() }, '📚 Mes soirées'),
+  h('button', { type: 'button', class: on === 'photos' ? 'on' : '', onclick: () => showGallery() }, '🖼️ Photos et captures'));
+
+/** Réduit l'image (1600 px max, JPEG) : photos et captures d'écran (PNG, WebP…) sont converties. */
+async function toJpeg(file) {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => null);
+  const img = bitmap || await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error('Image illisible')); i.src = URL.createObjectURL(file); });
+  const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+  const canvas = h('canvas');
+  canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); // fond blanc pour les PNG transparents
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', 0.85));
+}
+
+/** Bouton « Ajouter » : choisit une ou plusieurs images et les range dans la soirée. */
+function addCapturesButton(soireeId, done) {
+  const input = h('input', { type: 'file', accept: 'image/*', multiple: true, class: 'hidden' });
+  input.addEventListener('change', async () => {
+    const files = [...input.files].slice(0, 20);
+    input.value = '';
+    let ok = 0;
+    for (const [i, file] of files.entries()) {
+      toast(`📤 Envoi ${i + 1}/${files.length}…`);
+      try {
+        const blob = await toJpeg(file);
+        const res = await fetch(`/api/me/soirees/${soireeId}/photos`, { method: 'POST', body: blob, headers: { 'content-type': 'image/jpeg', 'x-showtime': '1' } });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || 'Envoi impossible');
+        ok++;
+      } catch (e) { toast(`❌ ${file.name} : ${e.message}`, 4000); }
+      if (i < files.length - 1) await new Promise((r) => setTimeout(r, 1600));
+    }
+    if (ok) { toast(`✅ ${ok} image${ok > 1 ? 's' : ''} ajoutée${ok > 1 ? 's' : ''} au répertoire`); done(); }
+  });
+  return h('label', { class: 'btn gold' }, '➕ Ajouter des photos ou captures', input);
+}
+
+/** Une vignette de photo, avec téléchargement et suppression de ses propres images. */
+function photoFigure(p, myId, caption) {
+  const fig = h('figure', { class: 'photo' },
+    h('a', { href: `/api/photos/${p.id}`, target: '_blank', rel: 'noopener' }, h('img', { src: `/api/photos/${p.id}`, alt: `Image de ${p.uploaderName}`, loading: 'lazy' })),
+    h('figcaption', {}, h('span', { text: caption }),
+      h('a', { class: 'chip', href: `/api/photos/${p.id}`, download: `showtime-${p.code || 'soiree'}-${p.id.slice(0, 6)}.jpg` }, '⬇️'),
+      p.uploaderUserId === myId ? h('button', { class: 'chip', title: 'Supprimer mon image', onclick: async () => { if (!confirm('Supprimer définitivement cette image ?')) return; await api('DELETE', `/photos/${p.id}`); fig.remove(); toast('Image supprimée'); } }, '🗑️') : ''));
+  return fig;
+}
+
+/** Toutes les photos et captures des soirées de l'adhérent, rangées par soirée. */
+async function showGallery() {
+  app.replaceChildren(header(), h('p', { class: 'muted-center', text: 'Chargement de votre répertoire…' }));
+  const { photos, me: myId } = await api('GET', '/me/photos');
+  const bySoiree = new Map();
+  photos.forEach((p) => { if (!bySoiree.has(p.soireeId)) bySoiree.set(p.soireeId, []); bySoiree.get(p.soireeId).push(p); });
+  const back = h('a', { class: 'btn ghost', href: next || '/' }, next ? '↩️ Retour à la partie' : '🎬 Jouer');
+  const sections = [...bySoiree.values()].sort((a, b) => String(b[0].startedAt).localeCompare(String(a[0].startedAt))).map((list) => h('section', { class: 'dir-folder' },
+    h('button', { class: 'dir-folder-head', onclick: () => showSoiree(list[0].soireeId) },
+      h('span', { text: '📁' }), h('b', { text: fmtDate(list[0].startedAt) }), h('small', { text: `salon ${list[0].code} · ${list.length} image${list.length > 1 ? 's' : ''} ›` })),
+    h('div', { class: 'photo-grid' }, ...list.map((p) => photoFigure(p, myId, `${p.uploaderUserId === myId ? '🙋 Moi' : `📸 ${p.uploaderName}`} · ${fmtTime(p.createdAt)}`)))));
+  app.replaceChildren(header(back), dirTabs('photos'),
+    h('p', { class: 'muted', text: 'Votre répertoire : les photos prises pendant vos soirées et les captures d’écran ajoutées ensuite. Elles ne sont visibles que par les joueurs de la soirée concernée. Pour ajouter des images, ouvrez une soirée.' }),
+    ...(sections.length ? sections : [h('div', { class: 'account-card panel empty' }, h('div', { class: 'big-emoji', text: '🖼️' }), h('b', { text: 'Pas encore d’image' }),
+      h('p', { class: 'muted', text: 'Ouvrez une de vos soirées et touchez « Ajouter des photos ou captures ».' }))]));
 }
 
 async function showSoiree(id) {
   app.replaceChildren(header(), h('p', { class: 'muted-center', text: 'Chargement…' }));
   const { soiree: s, me: myId } = await api('GET', `/me/soirees/${id}`);
-  const back = h('button', { class: 'btn ghost', onclick: () => showHistory() }, '← Mes soirées');
+  const back = h('button', { class: 'btn ghost', onclick: () => showHistory() }, '← Mon répertoire');
   const ranking = h('div', { class: 'mini-board' }, ...s.participants.map((p) => h('div', { class: p.userId === myId ? 'me' : '' },
     h('b', { text: p.rank ? `${p.rank}.` : '–', style: 'width:1.8em;text-align:right;color:var(--text)' }), h('span', { class: 'avatar sm', text: p.avatar }),
     h('span', { class: 'n', text: p.name }), h('b', { text: p.score.toLocaleString('fr-FR') }))));
   const games = h('div', { class: 'chips-line' }, ...(s.summary.games || []).map((g) => h('span', { class: 'chip', text: `${g.icon} ${g.title}` })));
   const cards = h('div', { class: 'souvenir-grid' }, ...s.souvenirs.map(souvenirCard));
-  const gallery = h('div', { class: 'photo-grid' }, ...s.photos.map((p) => {
-    const fig = h('figure', { class: 'photo' },
-      h('a', { href: `/api/photos/${p.id}`, target: '_blank', rel: 'noopener' }, h('img', { src: `/api/photos/${p.id}`, alt: `Photo de ${p.uploaderName}`, loading: 'lazy' })),
-      h('figcaption', {}, h('span', { text: `📸 ${p.uploaderName} · ${fmtTime(p.createdAt)}` }),
-        h('a', { class: 'chip', href: `/api/photos/${p.id}`, download: `showtime-${s.code}-${p.id.slice(0, 6)}.jpg` }, '⬇️'),
-        p.uploaderUserId === myId ? h('button', { class: 'chip', title: 'Supprimer ma photo', onclick: async () => { if (!confirm('Supprimer définitivement cette photo ?')) return; await api('DELETE', `/photos/${p.id}`); fig.remove(); toast('Photo supprimée'); } }, '🗑️') : ''));
-    return fig;
-  }));
+  const gallery = h('div', { class: 'photo-grid' }, ...s.photos.map((p) => photoFigure({ ...p, code: s.code }, myId, `📸 ${p.uploaderName} · ${fmtTime(p.createdAt)}`)));
   app.replaceChildren(header(back),
     h('div', { class: 'account-card panel' }, h('h1', { class: 'soiree-title', text: fmtDate(s.startedAt) }), h('p', { class: 'muted', text: `Salon ${s.code} · ${fmtTime(s.startedAt)}${s.endedAt ? ` → ${fmtTime(s.endedAt)}` : ''}` }), games),
     h('h2', { class: 'family', text: '🏆 Classement' }), ranking,
     h('h2', { class: 'family', text: `✨ Cartes souvenirs (${s.souvenirs.length})` }), s.souvenirs.length ? cards : h('p', { class: 'muted', text: 'Pas encore de souvenir pour cette soirée.' }),
-    h('h2', { class: 'family', text: `📸 Photos (${s.photos.length})` }), s.photos.length ? gallery : h('p', { class: 'muted', text: 'Aucune photo prise pendant cette soirée.' }));
+    h('h2', { class: 'family', text: `📸 Photos et captures (${s.photos.length})` }), h('div', { class: 'dir-add' }, addCapturesButton(s.id, () => showSoiree(id)), h('small', { class: 'muted', text: 'Photos ou captures d’écran de la soirée, visibles uniquement par ses joueurs.' })),
+    s.photos.length ? gallery : h('p', { class: 'muted', text: 'Aucune image pour cette soirée pour l’instant.' }));
 }
 
 function souvenirCard(v) {

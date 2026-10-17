@@ -1005,3 +1005,47 @@ body.split .cam-btn { width: 50px; height: 50px; font-size: 1.5rem; }
 .theme-chips .chip { font-size: 0.85rem; }
 .theme-votes { color: var(--cyan) !important; font-weight: 700; }
 
+
+/* « Entre nous » */
+.pview.couple { background: radial-gradient(ellipse at top, rgba(255, 61, 139, 0.18), transparent 70%); border-radius: 20px; }
+.cp-head { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+.cp-intro { color: #ffd1e6 !important; }
+.cp-q { font-family: var(--body) !important; font-weight: 900 !important; font-size: 1.5rem !important; }
+.cp-options { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.cp-opt { padding: 16px; border-radius: 16px; font-weight: 800; font-size: 1.05rem; background: linear-gradient(135deg, rgba(255, 61, 139, 0.3), rgba(139, 92, 246, 0.3)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); }
+.cp-opt:active { transform: scale(0.98); }
+.cp-card { width: 100%; padding: 20px 18px; border-radius: 20px; text-align: center; background: linear-gradient(160deg, #3b0d2e, #1d0b3a); box-shadow: inset 0 0 0 2px var(--pink), 0 0 30px rgba(255, 61, 139, 0.3); }
+.cp-card b { font-size: 1.3rem; line-height: 1.35; }
+.cp-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.cp-wishes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+.cp-wish { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 6px; border-radius: 16px; background: var(--panel-strong); font-weight: 800; }
+.cp-wish span { font-size: 2rem; }
+.cp-wish.yes { box-shadow: inset 0 0 0 2px var(--pink); } .cp-wish.maybe { box-shadow: inset 0 0 0 2px var(--gold); } .cp-wish.no { box-shadow: inset 0 0 0 1px var(--line); }
+.cp-answers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.cp-answers div { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 14px; background: var(--panel-strong); }
+.cp-answers small { color: var(--muted); }
+.cp-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.cp-list div { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(255, 61, 139, 0.16); text-align: left; }
+.couple-spot .duo .avatar { margin: 0 -0.4em; }
+.tile.adult-tile { background: linear-gradient(160deg, rgba(255, 61, 139, 0.2), rgba(59, 13, 46, 0.6)); }
+
+/* Répertoire de l'adhérent : soirées, photos et captures */
+.dir-tabs { margin: 18px 0 8px; }
+.dir-add { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 12px; }
+.dir-add label.btn { cursor: pointer; }
+.dir-folder { margin: 14px 0 22px; }
+.dir-folder-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; margin-bottom: 10px; border-radius: 14px; background: var(--panel-strong); text-align: left; flex-wrap: wrap; }
+.dir-folder-head span { font-size: 1.4rem; }
+.dir-folder-head b { text-transform: capitalize; }
+.dir-folder-head small { color: var(--muted); margin-left: auto; }
+
+/* Pause */
+.pause-overlay { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 16px; background: rgba(8, 4, 24, 0.82); backdrop-filter: blur(6px); }
+.pause-card { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 460px; padding: 28px 24px; border-radius: 24px; text-align: center; background: var(--panel-strong); box-shadow: inset 0 0 0 2px var(--gold), 0 20px 60px rgba(0, 0, 0, 0.5); }
+.pause-ic { font-size: 3.5rem; animation: pulse 1.6s ease-in-out infinite; }
+.pause-card h1 { font-family: var(--display); font-size: 2.6rem; color: var(--gold); margin: 0; }
+.pause-card p { margin: 0; }
+.pause-time b { font-size: 1.4em; color: var(--gold); font-variant-numeric: tabular-nums; }
+.pause-card small { color: var(--muted); }
+.pause-btn { margin-left: 6px; padding: 6px 10px; border-radius: 999px; background: var(--panel-strong); font-weight: 800; font-size: 0.85rem; }
+body.mini .pause-card { padding: 14px; gap: 6px; } body.mini .pause-card h1 { font-size: 1.6rem; } body.mini .pause-ic { font-size: 2rem; }

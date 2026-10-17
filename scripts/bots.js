@@ -47,6 +47,15 @@ function startBot(url, code, index, { log = () => {}, speed = 1 } = {}) {
         case 'quizQuestion':
           if (s.myAnswer == null) later(() => act({ type: 'answer', choice: rnd(4) }));
           break;
+        case 'cpGuess':
+          if (s.mine == null) later(() => act({ type: 'answer', choice: rnd(s.item.a.length) }));
+          break;
+        case 'cpWish':
+          if (!s.mine) later(() => act({ type: 'wish', value: pickOne(['yes', 'maybe', 'no']) }));
+          break;
+        case 'cpTalk':
+          if (s.cp.isMe) later(() => act({ type: Math.random() < 0.8 ? 'done' : 'joker' }), 800, 1200);
+          break;
         case 'whoVote':
           if (!s.isAuthor && !s.myVote && s.candidates.length) later(() => act({ type: 'vote', target: pickOne(s.candidates).id }));
           break;

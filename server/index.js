@@ -103,7 +103,7 @@ setInterval(() => {
   for (const [code, room] of rooms) {
     room.tick();
     const nobody = !room.hostSocket && room.connectedPlayers().length === 0;
-    if (now - room.lastActivity > 4 * 3600_000 || (nobody && now - room.lastActivity > 30 * 60_000)) {
+    if (now - room.lastActivity > 4 * 3600_000 || (nobody && !room.paused && now - room.lastActivity > 30 * 60_000)) {
       room.destroy();
       rooms.delete(code);
     }
@@ -159,6 +159,8 @@ io.on('connection', (socket) => {
       case 'end': return room.endNow();
       case 'nudge': return room.nudge();
       case 'cancelStart': return room.cancelAutoStart();
+      case 'pause': return room.pause('L’animateur');
+      case 'resume': return room.resume('L’animateur');
       default:
     }
   });

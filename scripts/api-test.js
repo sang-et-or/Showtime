@@ -113,12 +113,28 @@ async function main() {
     r = await call('GET', `/api/photos/${photoId}`, { cookie: other.cookie });
     assert(r.status === 403, 'un autre compte ne peut pas voir la photo');
 
+    // répertoire : capture d'écran ajoutée après la soirée
+    const jpg = { 'content-type': 'image/jpeg' };
+    r = await call('POST', `/api/me/soirees/${sid}/photos`, { cookie, body: JPEG, headers: jpg });
+    assert(r.status === 200 && r.json.id, 'un adhérent ajoute une capture à sa soirée');
+    const captureId = r.json.id;
+    r = await call('POST', `/api/me/soirees/${sid}/photos`, { cookie: other.cookie, body: JPEG, headers: jpg });
+    assert(r.status === 404, 'un autre compte ne peut pas ajouter d’image à cette soirée');
+    r = await call('POST', `/api/me/soirees/${sid}/photos`, { body: JPEG, headers: jpg });
+    assert(r.status === 401, 'il faut être connecté pour ajouter une capture');
+    r = await call('GET', '/api/me/photos', { cookie });
+    assert(r.json.photos.length === 2 && r.json.photos.some((p) => p.id === captureId && p.code === created.code), 'le répertoire liste photos et captures de la soirée');
+    r = await call('GET', '/api/me/photos', { cookie: other.cookie });
+    assert(r.json.photos.length === 0, 'le répertoire d’un autre compte reste vide');
+
     // rattacher après coup un joueur qui n'était pas connecté
     r = await call('POST', '/api/auth/claim', { cookie: other.cookie, body: { code: created.code, playerId: bots[0].id, token: bots[0].token } });
     assert(r.json.ok, 'un joueur peut rattacher la soirée à son compte après coup');
     await sleep(300);
     r = await call('GET', '/api/me/soirees', { cookie: other.cookie });
     assert(r.json.soirees.length === 1, 'la soirée apparaît dans l’historique du compte rattaché');
+    r = await call('GET', `/api/photos/${captureId}`, { cookie: other.cookie });
+    assert(r.status === 200, 'les joueurs de la soirée voient la capture ajoutée');
 
     // suppression du compte (RGPD)
     r = await call('DELETE', '/api/auth/me', { cookie, body: { password: 'motdepasse123' } });

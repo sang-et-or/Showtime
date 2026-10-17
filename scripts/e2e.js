@@ -8,7 +8,8 @@ const path = require('path');
 const { io } = require('socket.io-client');
 const { startBot } = require('./bots');
 
-const PORT = 3999;
+// Port au hasard : deux lancements simultanés des tests ne se marchent pas dessus.
+const PORT = Number(process.env.TEST_PORT) || 4000 + Math.floor(Math.random() * 1000);
 const URL = `http://localhost:${PORT}`;
 const assert = (cond, msg) => { if (!cond) throw new Error(`ÉCHEC : ${msg}`); console.log(`  ✓ ${msg}`); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -18,7 +19,7 @@ const INPUT = new Set(['writing', 'quizQuestion', 'whoVote', 'defiGet', 'defiAct
   'batFlip', 'bjBet', 'bjPlay', 'pkPlay', 'blBid', 'blPlay', 'prPlay', 'htPlay']);
 
 async function main() {
-  const server = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env: { ...process.env, PORT: String(PORT), SHOWTIME_GAME_CAP_MS: '30000' }, stdio: 'ignore' });
+  const server = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env: { ...process.env, PORT: String(PORT), SHOWTIME_GAME_CAP_MS: '30000' }, stdio: ['ignore', 'ignore', 'inherit'] });
   try {
     for (let i = 0; i < 50; i++) { try { if ((await fetch(`${URL}/healthz`)).ok) break; } catch { await sleep(100); } }
 
@@ -68,7 +69,7 @@ async function main() {
         if (hs.canSkip && !INPUT.has(hs.phase)) host.emit('host:action', { type: 'skip' });
         await sleep(250);
       }
-      assert(hs.phase === 'final', `${label} : partie terminée en ${Math.round((Date.now() - t0) / 1000)} s`);
+      assert(hs.phase === 'final', `${label} : partie terminée en ${Math.round((Date.now() - t0) / 1000)} s (phases : ${phases.join(', ')})`);
       await sleep(300);
       assert(bots.every((b) => b.state.phase === 'final' && b.state.me.score === hs.ranking.find((r) => r.id === b.id).score), `${label} : scores identiques sur les téléphones et l’écran (${hs.ranking.map((r) => `${r.name} ${r.score}`).join(', ')})`);
       return [...phases];
@@ -110,6 +111,34 @@ async function main() {
     assert(hs.phase !== 'lobby', `lancement automatique de la partie (phase « ${hs.phase} »)`);
 
     host.close(); bots.forEach((b) => b.socket.close());
+
+    // Jeu privé « Entre nous » : deux joueurs, l'écran principal ne reçoit jamais le contenu, rien n'est enregistré.
+    if (!process.env.ONLY || process.env.ONLY.split(',').includes('couple')) {
+      const cHost = io(URL, { transports: ['websocket'], forceNew: true });
+      let cs = null;
+      const cPhases = [];
+      const hostDump = [];
+      cHost.on('state', (s) => { cs = s; hostDump.push(JSON.stringify(s)); if (cPhases[cPhases.length - 1] !== s.phase) cPhases.push(s.phase); });
+      const c = await new Promise((r) => cHost.emit('host:create', { mode: 'local', format: 'quick', game: 'couple' }, r));
+      const duo = [await startBot(URL, c.code, 0), await startBot(URL, c.code, 1)];
+      await sleep(200);
+      cHost.emit('host:action', { type: 'settings', settings: { format: 'quick', game: 'couple', length: 'short', coupleLevel: 'audace' } });
+      await sleep(200);
+      cHost.emit('host:action', { type: 'start' });
+      const t0 = Date.now();
+      while (cs.phase !== 'final' && Date.now() - t0 < 240_000) {
+        if (cs.canSkip && !['cpGuess', 'cpTalk', 'cpWish'].includes(cs.phase)) cHost.emit('host:action', { type: 'skip' });
+        await sleep(250);
+      }
+      assert(cs.phase === 'final', `Entre nous : partie terminée en ${Math.round((Date.now() - t0) / 1000)} s (phases : ${cPhases.join(', ')})`);
+      assert(['cpGuess', 'cpGuessReveal', 'cpTalk', 'cpWish', 'cpWishReveal', 'cpEnd'].every((p) => cPhases.includes(p)), 'Entre nous : toutes les phases jouées');
+      const { GUESS, TRUTHS, DARES, WISHES } = require('../server/content/couple');
+      const texts = [...Object.values(GUESS).flat().map((g) => g.q), ...[TRUTHS, DARES, WISHES].flatMap((x) => Object.values(x).flat())];
+      const all = hostDump.join('\n');
+      assert(!texts.some((t) => all.includes(JSON.stringify(t).slice(1, -1))), 'Entre nous : aucune question ni envie n’apparaît sur l’écran principal');
+      assert(duo.every((b) => b.state.photos === false), 'Entre nous : photos désactivées sur les téléphones');
+      cHost.close(); duo.forEach((b) => b.socket.close());
+    }
     console.log('\n🎉 Tous les tests sont passés.');
   } finally {
     server.kill();

@@ -94,6 +94,7 @@ sécurité de base, coupure et reconnexion d'un joueur, toutes les phases, cohé
 
 | Bouton (en haut à droite) | Effet |
 | --- | --- |
+| **⏸️ Pause** | met la partie en pause pour tout le monde (voir ci-dessous) |
 | **Suivant ⏭** | passe l'écran en cours (révélation, classement, intro…) |
 | **Finale 🏁** | abrège la partie et lance directement le podium |
 | 🗣️ / 🔊 | coupe la voix de l'animateur / les bruitages |
@@ -101,6 +102,10 @@ sécurité de base, coupure et reconnexion d'un joueur, toutes les phases, cohé
 
 Un joueur qui perd le réseau ou verrouille son téléphone **retrouve sa place automatiquement** en rouvrant la page.
 L'hôte peut aussi recharger sa page sans perdre la partie.
+
+**Pause.** Chaque joueur peut mettre la partie en pause avec le bouton ⏸️ en haut de son téléphone, et l'hôte peut le faire avec **⏸️ Pause**.
+Tout s'arrête : le minuteur est figé là où il en était. N'importe qui (joueur ou hôte) peut toucher **▶️ Reprendre la partie**, et le jeu repart au même endroit.
+Si personne ne reprend dans les **50 minutes**, la partie s'arrête et le classement final s'affiche. Un compte à rebours est visible sur tous les écrans.
 
 ---
 
@@ -234,7 +239,7 @@ Après une modification, relancez `npm start` (ou utilisez `npm run dev`, qui re
 
 ## 7. Comptes, historique, souvenirs et photos
 
-- **Compte facultatif** (page « 👤 Mon compte », lien en haut de l'accueil) : e-mail, mot de passe, pseudo et avatar.
+- **Compte facultatif** (page « 👤 Mon répertoire », lien en haut de l'accueil) : e-mail, mot de passe, pseudo et avatar.
   Un joueur connecté retrouve chaque soirée dans son **historique** : jeux joués, classement, **cartes souvenirs** et **photos**.
 - **Cartes souvenirs automatiques** : le podium, le buzzer le plus rapide, le bluff de la soirée, la meilleure performance,
   le plus gros pot au poker, le roi du bluff à l'Imposteur, le capot à la belote…
@@ -244,6 +249,18 @@ Après une modification, relancez `npm start` (ou utilisez `npm run dev`, qui re
 - **Vie privée** : mots de passe chiffrés, photos visibles uniquement par les joueurs de la soirée, chacun peut supprimer
   ses photos ou tout son compte (les classements restent, sans lien avec la personne). Un rappel invite à demander l'accord
   des personnes photographiées avant la première photo.
+
+### Répertoire des adhérents
+
+La page « 👤 Mon répertoire » (lien en haut de l'accueil) est l'espace personnel de chaque adhérent, avec deux onglets :
+- **📚 Mes soirées** : l'historique (date, jeux joués, classement, cartes souvenirs, photos).
+- **🖼️ Photos et captures** : toutes les images de ses soirées, rangées dans un dossier par soirée (la plus récente en haut),
+  à télécharger (⬇️) ou supprimer si on les a envoyées soi-même (🗑️).
+
+Dans une soirée, le bouton **« ➕ Ajouter des photos ou captures »** permet d'ajouter après coup des **captures d'écran**
+ou des photos du téléphone ou de l'ordinateur (jusqu'à 20 à la fois, 60 par personne et par soirée). Toutes les images
+(PNG, JPEG…) sont réduites et converties en JPEG avant l'envoi. Elles ne sont visibles que par les joueurs de cette soirée,
+et elles sont effacées si leur auteur supprime son compte.
 
 ### Brancher la base de données Neon (gratuit, 10 minutes)
 
@@ -269,3 +286,18 @@ L'offre gratuite de Neon (0,5 Go) permet de garder plusieurs milliers de photos 
 - **🗳️ Vote des jeux** : dans le salon, chaque joueur vote sur son téléphone pour le jeu qu'il veut (Grand Show, quiz,
   plateaux, cartes). La télé affiche le décompte en direct ; au lancement (bouton de l'hôte ou « tous prêts »), le jeu le plus
   voté est lancé, avec tirage au sort en cas d'égalité. Activé d'office à distance ; l'hôte peut choisir « 🎛️ Je choisis ».
+
+## 9. Jeu privé pour adultes : « Entre nous » 🔥
+
+Un jeu à **deux exactement**, pour les couples, rangé dans la famille « 🔞 Pour adultes » (accueil et « Changer de jeu »).
+Une confirmation « adultes consentants » est demandée avant de l'ouvrir. Il ne fait jamais partie des votes ni du Grand Show.
+
+- **Trois niveaux**, choisis dans le salon : 💗 Douceur (tendresse, compliments), 💞 Complicité (massages, baisers),
+  🔥 Audace (pour pimenter, toujours avec l'accord de l'autre).
+- **Quatre types d'étapes** : « Je te connais » (l'un répond, l'autre devine), Vérité, Défi, Envie secrète.
+- **Consentement** : chaque vérité ou défi peut être passé avec le **Joker**. Pour les envies secrètes, seules celles où
+  les deux ont dit « oui » ou « peut-être » sont révélées ; un « non » n'est **jamais** dévoilé.
+- **Confidentialité** : les questions ne s'affichent que sur les deux téléphones ; la télé montre seulement
+  « Regardez vos téléphones ». **Rien n'est enregistré** (ni historique, ni souvenirs) et les **photos sont désactivées**.
+- Durée : courte (8 étapes), normale (12) ou longue (16). À la fin, chacun retrouve sur son téléphone la liste des envies partagées.
+- Contenus modifiables dans `server/content/couple.js`.

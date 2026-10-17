@@ -245,3 +245,30 @@ function makeCountdown(onTick) {
     stop() { cancelAnimationFrame(raf); },
   };
 }
+
+/** Écran de pause commun (télé et téléphones) : compte à rebours avant la fin de partie et bouton « Reprendre ». */
+const PauseOverlay = (() => {
+  let el = null; let tick = null; let endAt = 0;
+  const mmss = (ms) => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+  return {
+    /** @param {{by:string, remainingMs:number, maxMs:number}|null} p @param {(() => void)|null} onResume */
+    set(p, onResume) {
+      if (!p) { if (el) { el.remove(); el = null; clearInterval(tick); SFX.whoosh(); } return; }
+      endAt = Date.now() + p.remainingMs;
+      if (el) return;
+      const left = h('b', { class: 'pause-left' });
+      el = h('div', { class: 'pause-overlay', role: 'dialog', 'aria-label': 'Partie en pause' },
+        h('div', { class: 'pause-card' },
+          h('div', { class: 'pause-ic', text: '⏸️' }),
+          h('h1', { text: 'Pause' }),
+          h('p', { text: `Demandée par ${p.by}. Prenez votre temps !` }),
+          h('p', { class: 'pause-time' }, 'Reprise possible encore ', left),
+          h('small', { text: `Sans reprise dans les ${Math.round(p.maxMs / 60_000)} minutes, la partie s’arrête et le classement final s’affiche.` }),
+          onResume ? h('button', { class: 'btn gold big', onclick: () => { onResume(); SFX.tap(); } }, '▶️ Reprendre la partie') : ''));
+      document.body.append(el);
+      SFX.pop();
+      const paint = () => { left.textContent = mmss(endAt - Date.now()); };
+      paint(); tick = setInterval(paint, 1000);
+    },
+  };
+})();

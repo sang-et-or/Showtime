@@ -9,7 +9,7 @@
 
 const animator = require('./animator');
 const { CATEGORIES, DEFAULT_CATEGORIES, CLUBS } = require('./content/questions');
-const { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, CARD_GAMES, ownerOf } = require('./rounds');
+const { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, CARD_GAMES, ADULT_GAMES, ownerOf } = require('./rounds');
 const { token, shortId } = require('./util');
 const { installMemories } = require('./memories');
 
@@ -18,6 +18,7 @@ const MAX_PLAYERS = 12;
 const LENGTHS = ['short', 'normal', 'long'];
 const DURATIONS = { roundIntro: 7_000, leaderboard: 7_000, podium: 7_000 };
 const AUTOSTART_MS = 10_000;
+const PAUSE_MAX_MS = Number(process.env.SHOWTIME_PAUSE_MAX_MS) || 50 * 60_000; // au-delà, la partie s'arrête
 const ALL_GAMES = [...QUICK_GAMES, ...BOARD_GAMES, ...CARD_GAMES]; // compte à rebours quand tout le monde est prêt
 const COLORS = ['#ff3d8b', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c', '#f87171', '#34d399', '#60a5fa', '#f472b6', '#fde047', '#2dd4bf'];
 
@@ -40,6 +41,7 @@ class Room {
       clubs: [], // vide = tous les clubs
       photos: true, // les joueurs peuvent prendre des photos souvenirs
       vote: false, // les joueurs votent pour le jeu (activé d'office à distance)
+      coupleLevel: 'douceur', // niveau du jeu de couple « Entre nous »
     };
     this.phase = 'lobby';
     this.data = {};
@@ -53,6 +55,8 @@ class Room {
     this.timerTotal = 0;
     this.timerVisible = false;
     this.pendingNext = null;
+    this.paused = null; // { by, at, until, fn, remaining, total, visible } pendant une pause
+    this.pauseTimer = null;
     this.line = { id: 0, text: '' };
     this.snapshot = new Map(); // pid -> { rank, score } au dernier classement affiché
     this.createdAt = Date.now(); // servira à la limite de découverte gratuite (≈ 15 min)
@@ -98,6 +102,7 @@ class Room {
 
   /** Passe immédiatement à l'étape suivante (bouton « Suivant » de l'hôte). */
   skip() {
+    if (this.paused) return;
     const fn = this.pendingNext;
     if (!fn) return;
     this.clearTimer();
@@ -130,6 +135,9 @@ class Room {
   }
 
   current() { return ownerOf(this.phase); }
+
+  /** Partie privée (jeu de couple) : rien n'est enregistré, pas de photos. */
+  isPrivate() { return this.settings.format === 'quick' && ROUNDS[this.settings.game]?.privateGame === true; }
 
   gameTitle(id) { const m = ROUNDS[id]; return m && !m.prep ? m.title : null; }
 
@@ -211,6 +219,9 @@ class Room {
 
   /** Action d'un joueur : transmise au jeu en cours. */
   act(p, msg) {
+    if (msg.type === 'pause') { this.pause(p.name); return; }
+    if (msg.type === 'resume') { this.resume(p.name); return; }
+    if (this.paused) return; // tout est figé pendant la pause
     if (this.phase === 'lobby') {
       if (msg.type === 'ready') { p.ready = !!msg.on; this.touch(); this.checkReady(); this.sync(); }
       if (msg.type === 'voteGame' && this.settings.vote && (msg.game === 'show' || ALL_GAMES.includes(msg.game))) { p.vote = msg.game; this.touch(); this.sync(); }
@@ -229,6 +240,7 @@ class Room {
   /** Demande au jeu en cours si tout le monde a fini (après une déconnexion par exemple). */
   check() {
     if (this.phase === 'lobby') { this.checkReady(); return; }
+    if (this.paused) return;
     const mod = this.current();
     if (mod && mod.check) mod.check(this);
   }
@@ -319,7 +331,8 @@ class Room {
     const se = this.settings;
     if ((s.mode === 'local' || s.mode === 'remote') && s.mode !== se.mode) { se.mode = s.mode; se.vote = s.mode === 'remote'; }
     if (s.format === 'show' || s.format === 'quick') se.format = s.format;
-    if (QUICK_GAMES.includes(s.game) || BOARD_GAMES.includes(s.game) || CARD_GAMES.includes(s.game)) se.game = s.game;
+    if (QUICK_GAMES.includes(s.game) || BOARD_GAMES.includes(s.game) || CARD_GAMES.includes(s.game) || ADULT_GAMES.includes(s.game)) se.game = s.game;
+    if (['douceur', 'complicite', 'audace'].includes(s.coupleLevel)) se.coupleLevel = s.coupleLevel;
     if (LENGTHS.includes(s.length)) se.length = s.length;
     if (s.rounds && typeof s.rounds === 'object') {
       const next = { ...se.rounds };
@@ -356,7 +369,7 @@ class Room {
     this.snapshot = new Map([...this.players.values()].map((p, i) => [p.id, { rank: i + 1, score: 0 }]));
     this.ctx = { usedQuestions: new Set() };
     this.program = this.buildProgram();
-    this.ensureSoiree(); // la soirée entre dans l'historique des joueurs connectés
+    if (!this.isPrivate()) this.ensureSoiree(); // la soirée entre dans l'historique des joueurs connectés
     this.roundIndex = -1;
     this.manche = 0;
     this.touch();
@@ -398,7 +411,55 @@ class Room {
     this.goLeaderboard(`Après « ${mod.title} »`, () => this.nextRound());
   }
 
+  // ---------- pause ----------
+  /** Chaque joueur (ou l'hôte) peut mettre la partie en pause ; le minuteur en cours est figé. */
+  pause(who) {
+    if (this.paused || this.phase === 'lobby' || this.phase === 'final') return;
+    const now = Date.now();
+    this.paused = {
+      by: who, at: now, until: now + PAUSE_MAX_MS,
+      fn: this.pendingNext, remaining: this.pendingNext ? Math.max(1_500, this.deadline - now) : 0, total: this.timerTotal, visible: this.timerVisible,
+    };
+    this.clearTimer();
+    this.pauseTimer = setTimeout(() => this.pauseExpired(), PAUSE_MAX_MS);
+    this.say(`Pause ! ${who} a demandé une pause. Vous avez ${Math.round(PAUSE_MAX_MS / 60_000)} minutes pour reprendre, sinon la partie s’arrête.`);
+    this.touch();
+    this.sync();
+  }
+
+  /** Reprise : le minuteur repart là où il s'était arrêté. */
+  resume(who) {
+    const pz = this.paused;
+    if (!pz) return;
+    this.clearPause();
+    if (pz.fn) { this.setTimer(pz.remaining, pz.fn, pz.visible); this.timerTotal = Math.max(pz.total, pz.remaining); }
+    this.say(`C’est reparti ! ${who} relance la partie.`);
+    this.touch();
+    this.sync();
+  }
+
+  clearPause() {
+    if (this.pauseTimer) clearTimeout(this.pauseTimer);
+    this.pauseTimer = null;
+    this.paused = null;
+  }
+
+  /** Personne n'a repris à temps : fin de partie, direction le podium. */
+  pauseExpired() {
+    this.clearPause();
+    if (this.phase === 'lobby' || this.phase === 'final') return;
+    this.goFinal();
+    this.say(`La pause a duré plus de ${Math.round(PAUSE_MAX_MS / 60_000)} minutes : fin de la partie ! Voici le classement final.`);
+    this.sync();
+  }
+
+  pauseInfo() {
+    const pz = this.paused;
+    return pz ? { by: pz.by, remainingMs: Math.max(0, pz.until - Date.now()), maxMs: PAUSE_MAX_MS } : null;
+  }
+
   restart() {
+    this.clearPause();
     this.clearTimer();
     if (this.lineTimer) clearTimeout(this.lineTimer);
     for (const p of [...this.players.values()]) {
@@ -414,6 +475,7 @@ class Room {
   /** L'hôte peut abréger la partie et passer directement à la finale. */
   endNow() {
     if (this.phase === 'lobby' || this.phase === 'final') return;
+    this.clearPause();
     this.clearTimer();
     this.goFinal();
   }
@@ -459,7 +521,7 @@ class Room {
     const d = this.data;
     const base = {
       role: 'host', code: this.code, phase: this.phase, key: this.phase, settings: this.settings, line: this.line, ...this.timing(),
-      canSkip: !!this.pendingNext,
+      canSkip: !!this.pendingNext && !this.paused, paused: this.pauseInfo(), canPause: this.phase !== 'lobby' && this.phase !== 'final',
       players: [...this.players.values()].map((p) => ({ ...this.publicPlayer(p), score: p.score, connected: p.connected })),
       categories: CATEGORIES, clubs: CLUBS,
     };
@@ -483,7 +545,8 @@ class Room {
       me: { ...this.publicPlayer(p), score: p.score, rank: rank ? rank.rank : null },
       playerCount: this.players.size,
       line: this.settings.mode === 'remote' ? this.line : null,
-      photos: this.settings.photos, account: !!p.userId,
+      photos: this.settings.photos && !this.isPrivate(), account: !!p.userId, private: this.isPrivate(),
+      paused: this.pauseInfo(), canPause: this.phase !== 'lobby' && this.phase !== 'final',
     };
     switch (this.phase) {
       case 'lobby': {
@@ -522,6 +585,7 @@ class Room {
   }
 
   destroy() {
+    this.clearPause();
     this.clearTimer();
     if (this.lineTimer) clearTimeout(this.lineTimer);
   }
@@ -539,7 +603,7 @@ function catalog() {
     const m = ROUNDS[id];
     return { id, title: m.title, icon: m.icon, pitch: m.pitch, rules: m.rules || m.subtitle, players: m.players || '', duration: m.duration || '', min: m.minPlayers || 1 };
   };
-  return { show: SHOW_ROUNDS.map(info), quick: QUICK_GAMES.map(info), board: BOARD_GAMES.map(info), cards: CARD_GAMES.map(info), themes: CATEGORIES, clubs: CLUBS };
+  return { show: SHOW_ROUNDS.map(info), quick: QUICK_GAMES.map(info), board: BOARD_GAMES.map(info), cards: CARD_GAMES.map(info), adult: ADULT_GAMES.map(info), coupleLevels: ROUNDS.couple.LEVELS, themes: CATEGORIES, clubs: CLUBS };
 }
 
 installMemories(Room);

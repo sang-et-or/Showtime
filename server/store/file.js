@@ -100,6 +100,14 @@ function createFileStore(dir) {
       db.souvenirs = db.souvenirs.filter((s) => s.photoId !== id);
       save();
     },
+    /** Toutes les photos et captures des soirées auxquelles l'utilisateur a participé (les plus récentes d'abord). */
+    async photosOfUser(userId) {
+      const mine = new Set(db.participants.filter((p) => p.userId === userId).map((p) => p.soireeId));
+      return db.photos.filter((p) => mine.has(p.soireeId)).map((p) => {
+        const s = db.soirees.find((x) => x.id === p.soireeId) || {};
+        return { id: p.id, soireeId: p.soireeId, code: s.code, startedAt: s.startedAt, uploaderUserId: p.uploaderUserId, uploaderName: p.uploaderName, createdAt: p.createdAt };
+      }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 500);
+    },
     async linkPhotosOf(soireeId, pkey, userId) {
       db.photos.forEach((p) => { if (p.soireeId === soireeId && p.uploaderPkey === pkey && !p.uploaderUserId) p.uploaderUserId = userId; });
       save();

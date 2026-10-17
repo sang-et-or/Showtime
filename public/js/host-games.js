@@ -379,3 +379,28 @@ function gallowsSvg(errors) {
   });
   return svg;
 }
+
+// =====================================================================
+// « Entre nous » (couple) : l'écran principal reste neutre, tout se passe sur les téléphones.
+// =====================================================================
+function coupleScreen(root, s) {
+  SFX.whoosh();
+  const C = s.cp;
+  const label = { guess: '💞 Je te connais', truth: '💬 Vérité', dare: '🔥 Défi', wish: '🤫 Envie secrète' }[C.kind] || '💞 Entre nous';
+  const result = s.phase === 'cpGuessReveal' ? (C.match ? '💞 Vous vous connaissez par cœur !' : '😏 Raté… à vous de vous découvrir !')
+    : s.phase === 'cpWishReveal' ? (C.wishShared ? '🔥 Envie partagée !' : '🌙 On garde ça pour plus tard…') : '';
+  root.append(h('div', { class: 'spot couple-spot' },
+    h('div', { class: 'duo' }, ...C.players.filter(Boolean).map((p) => avatarEl(p, 'lg'))),
+    h('div', { class: 'kind-badge defi', text: label }),
+    h('h1', { class: 'spot-title', text: result || '📱 Regardez vos téléphones…' }),
+    h('p', { class: 'spot-sub', text: `Étape ${C.step} / ${C.total} · ${C.shared} envie${C.shared > 1 ? 's' : ''} partagée${C.shared > 1 ? 's' : ''} · 🔒 rien n’est enregistré` })));
+}
+Object.assign(VIEWS, {
+  cpGuess: coupleScreen, cpGuessReveal: coupleScreen, cpTalk: coupleScreen, cpWish: coupleScreen, cpWishReveal: coupleScreen,
+  cpEnd(root, s) {
+    SFX.fanfare();
+    root.append(h('div', { class: 'spot couple-spot' }, h('div', { class: 'big-emoji', text: '💞' }),
+      h('h1', { class: 'spot-title', text: `${s.cp.shared} envie${s.cp.shared > 1 ? 's' : ''} partagée${s.cp.shared > 1 ? 's' : ''}` }),
+      h('p', { class: 'spot-sub', text: 'La liste est sur vos téléphones… La suite vous appartient 😉' })));
+  },
+});

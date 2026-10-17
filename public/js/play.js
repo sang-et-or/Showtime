@@ -204,7 +204,9 @@ const act = (msg) => socket.emit('player:act', msg);
 function render(s) {
   state = s;
   $('#me-bar').classList.remove('hidden');
-  $('#me-bar').replaceChildren(avatarEl(s.me, 'sm'), h('div', { class: 'nm', text: s.me.name }), h('div', { class: 'score', text: `${fmt(s.me.score)} pts` }));
+  $('#me-bar').replaceChildren(avatarEl(s.me, 'sm'), h('div', { class: 'nm', text: s.me.name }), h('div', { class: 'score', text: `${fmt(s.me.score)} pts` }),
+    s.canPause && !s.paused ? h('button', { class: 'pause-btn', 'aria-label': 'Mettre la partie en pause', onclick: () => { if (confirm('Mettre la partie en pause pour tout le monde ? (50 minutes maximum)')) { act({ type: 'pause' }); SFX.tap(); } } }, '⏸️') : '');
+  PauseOverlay.set(s.paused, () => act({ type: 'resume' }));
   const rl = $('#remote-line');
   if (s.line && s.line.text) { rl.textContent = `🎙️ ${s.line.text}`; rl.classList.remove('hidden'); } else rl.classList.add('hidden');
 

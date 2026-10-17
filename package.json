@@ -8,7 +8,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "bots": "node scripts/bots.js",
-    "test": "node scripts/e2e.js && node scripts/api-test.js && node scripts/pg-test.js",
+    "test": "node scripts/e2e.js && node scripts/api-test.js && node scripts/pg-test.js && node scripts/pause-test.js",
     "test:api": "node scripts/api-test.js"
   },
   "engines": {
