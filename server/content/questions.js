@@ -17,10 +17,18 @@ const CATEGORIES = {
   annees80: { label: 'Années 80', icon: '📼', group: 'Époques' },
   annees90: { label: 'Années 90', icon: '💿', group: 'Époques' },
   annees2000: { label: 'Années 2000', icon: '📱', group: 'Époques' },
-  sport: { label: 'Sport', icon: '🏅', group: 'Sport' },
+  sport: { label: 'Sport général', icon: '🏅', group: 'Sport' },
   foot: { label: 'Football', icon: '⚽', group: 'Sport' },
   footfun: { label: 'Foot insolite', icon: '🤪', group: 'Sport' },
   clubs: { label: 'Clubs de L1', icon: '🏟️', group: 'Sport' },
+  footpeople: { label: 'Vie des stars du foot', icon: '⭐', group: 'Sport' },
+  rugby: { label: 'Rugby', icon: '🏉', group: 'Sport' },
+  tennis: { label: 'Tennis', icon: '🎾', group: 'Sport' },
+  sportsdivers: { label: 'Sports divers', icon: '🚴', group: 'Sport' },
+  politique: { label: 'Politique & institutions', icon: '🏛️', group: 'Société' },
+  animaux: { label: 'Animaux', icon: '🦁', group: 'Culture' },
+  sciences: { label: 'Sciences & espace', icon: '🔬', group: 'Culture' },
+  expressions: { label: 'Expressions françaises', icon: '🗣️', group: 'Culture' },
   coquin: { label: 'Coquin', icon: '🌶️', group: 'Pour adultes', adult: true },
 };
 // Thèmes proposés par défaut (tout public).
@@ -87,7 +95,7 @@ const QUESTIONS = [
   { cat: 'foot', q: 'Combien vaut un but marqué directement sur coup franc direct ?', a: ['1 but, comme les autres', '2 buts', '1 but et demi', 'Il ne compte pas'] },
 ];
 
-QUESTIONS.push(...require('./quiz-themes'), ...require('./quiz-clubs').QUESTIONS);
+QUESTIONS.push(...require('./quiz-themes'), ...require('./quiz-themes2'), ...require('./quiz-clubs').QUESTIONS);
 const { CLUBS } = require('./quiz-clubs');
 
 module.exports = { CATEGORIES, DEFAULT_CATEGORIES, QUESTIONS, CLUBS };

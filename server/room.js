@@ -214,6 +214,10 @@ class Room {
     if (this.phase === 'lobby') {
       if (msg.type === 'ready') { p.ready = !!msg.on; this.touch(); this.checkReady(); this.sync(); }
       if (msg.type === 'voteGame' && this.settings.vote && (msg.game === 'show' || ALL_GAMES.includes(msg.game))) { p.vote = msg.game; this.touch(); this.sync(); }
+      if (msg.type === 'voteThemes' && this.settings.vote && Array.isArray(msg.themes)) {
+        p.themeVotes = [...new Set(msg.themes.filter((k) => this.votableThemes().includes(k)))].slice(0, 5);
+        this.touch(); this.sync();
+      }
       return;
     }
     const mod = this.current();
@@ -238,6 +242,17 @@ class Room {
       .sort((a, b) => b.n - a.n);
   }
 
+  /** Thèmes de quiz proposables au vote : le thème adulte seulement si l'hôte l'a lui-même autorisé. */
+  votableThemes() {
+    return Object.keys(CATEGORIES).filter((k) => !CATEGORIES[k].adult || this.settings.categories.includes(k));
+  }
+
+  themeTally() {
+    const counts = new Map();
+    for (const p of this.connectedPlayers()) for (const k of p.themeVotes || []) counts.set(k, (counts.get(k) || 0) + 1);
+    return [...counts.entries()].map(([id, n]) => ({ id, n })).sort((a, b) => b.n - a.n);
+  }
+
   /** Au lancement : le jeu le plus voté l'emporte (tirage au sort en cas d'égalité). */
   applyVote() {
     if (!this.settings.vote) return;
@@ -245,6 +260,9 @@ class Room {
     if (!tally.length) return;
     const best = tally.filter((t) => t.n === tally[0].n);
     const win = best[crypto.randomInt(best.length)];
+    // Thèmes du quiz : les plus demandés par les joueurs (jusqu'à 6).
+    const themes = this.themeTally();
+    if (themes.length && (win.id === 'quiz' || win.id === 'show')) this.settings.categories = themes.slice(0, 6).map((t) => t.id);
     if (win.id === 'show') this.settings.format = 'show';
     else { this.settings.format = 'quick'; this.settings.game = win.id; }
     this.voteNote = best.length > 1 ? `Égalité dans les votes ! Le tirage au sort désigne… ${win.title} !` : `Les joueurs ont voté : place à ${win.title} !`;
@@ -333,7 +351,7 @@ class Room {
     if (this.connectedPlayers().length < 1) return;
     this.autoStart = false;
     this.applyVote();
-    for (const p of this.players.values()) { p.score = 0; p.streak = 0; p.ready = false; p.vote = null; }
+    for (const p of this.players.values()) { p.score = 0; p.streak = 0; p.ready = false; p.vote = null; p.themeVotes = []; }
     // Classement de départ : ordre d'arrivée (sinon tout le monde serait 1er ex aequo à 0 point).
     this.snapshot = new Map([...this.players.values()].map((p, i) => [p.id, { rank: i + 1, score: 0 }]));
     this.ctx = { usedQuestions: new Set() };
@@ -385,7 +403,7 @@ class Room {
     if (this.lineTimer) clearTimeout(this.lineTimer);
     for (const p of [...this.players.values()]) {
       if (!p.connected) this.players.delete(p.id);
-      else { p.score = 0; p.streak = 0; p.ready = false; p.vote = null; }
+      else { p.score = 0; p.streak = 0; p.ready = false; p.vote = null; p.themeVotes = []; }
     }
     this.enter('lobby');
     this.ctx = {};
@@ -446,7 +464,7 @@ class Room {
       categories: CATEGORIES, clubs: CLUBS,
     };
     switch (this.phase) {
-      case 'lobby': return { ...base, catalog: catalog(), ready: [...this.players.values()].filter((p) => p.ready).map((p) => p.id), autoStart: !!this.autoStart, needed: this.neededPlayers(), tally: this.voteTally(), voters: this.connectedPlayers().filter((p) => p.vote).length };
+      case 'lobby': return { ...base, catalog: catalog(), ready: [...this.players.values()].filter((p) => p.ready).map((p) => p.id), autoStart: !!this.autoStart, needed: this.neededPlayers(), tally: this.voteTally(), voters: this.connectedPlayers().filter((p) => p.vote).length, themeTally: this.themeTally().slice(0, 6).map((t) => ({ ...t, label: CATEGORIES[t.id].label, icon: CATEGORIES[t.id].icon })) };
       case 'roundIntro': return { ...base, key: `roundIntro:${this.roundIndex}`, round: d };
       case 'leaderboard': return { ...base, key: `leaderboard:${d.title}`, title: d.title, ranking: d.ranking };
       case 'final': return { ...base, ranking: d.ranking };
@@ -474,7 +492,11 @@ class Room {
         return {
           ...base, players: [...this.players.values()].map((x) => ({ ...this.publicPlayer(x), ready: x.ready })),
           ready: p.ready, readyCount, total: c.length, othersWaiting: readyCount > 0 && !p.ready, autoStart: !!this.autoStart,
-          vote: this.settings.vote ? { mine: p.vote || null, tally: this.voteTally(), options: voteOptions(), online: c.length } : null,
+          vote: this.settings.vote ? {
+            mine: p.vote || null, tally: this.voteTally(), options: voteOptions(), online: c.length,
+            myThemes: p.themeVotes || [], themeTally: this.themeTally(),
+            themes: this.votableThemes().map((k) => ({ id: k, label: CATEGORIES[k].label, icon: CATEGORIES[k].icon, group: CATEGORIES[k].group })),
+          } : null,
         };
       }
       case 'roundIntro': return { ...base, key: `roundIntro:${this.roundIndex}`, round: d };

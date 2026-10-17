@@ -256,6 +256,19 @@ const PVIEWS = {
                 onclick: () => { act({ type: 'voteGame', game: o.id }); SFX.tap(); buzz(30); },
               }, h('span', { text: o.icon }), h('b', { text: o.title }), counts.get(o.id) ? h('em', { text: `${counts.get(o.id)} 🗳️` }) : '');
             })));
+          // Le quiz (ou le Grand Show) a ma voix : je coche aussi mes thèmes préférés (5 max).
+          if (st.vote.mine === 'quiz' || st.vote.mine === 'show') {
+            const mineT = new Set(st.vote.myThemes);
+            const tcount = new Map(st.vote.themeTally.map((t) => [t.id, t.n]));
+            voteBox.append(h('h2', { text: `🧠 Tes thèmes de quiz (${mineT.size}/5)` }),
+              h('div', { class: 'theme-chips' }, ...st.vote.themes.map((t) => h('button', {
+                class: `chip${mineT.has(t.id) ? ' on' : ''}`,
+                onclick: () => {
+                  if (mineT.has(t.id)) mineT.delete(t.id); else if (mineT.size < 5) mineT.add(t.id); else { toast('5 thèmes maximum'); return; }
+                  act({ type: 'voteThemes', themes: [...mineT] }); SFX.tap();
+                },
+              }, `${t.icon} ${t.label}${tcount.get(t.id) ? ` · ${tcount.get(t.id)}` : ''}`))));
+          }
         }
         auto.classList.toggle('hidden', !st.autoStart);
         clearInterval(autoTick);

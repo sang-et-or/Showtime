@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=9">
+  <link rel="stylesheet" href="/css/style.css?v=10">
 </head>
 <body>
   <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -50,8 +50,13 @@
         <span class="btn gold big">Lancer le show</span>
       </a>
 
-      <h3 class="family">🧠 Quiz à thèmes <small>choisissez votre thème, le plus rapide gagne</small></h3>
-      <div class="theme-grid" id="theme-grid"></div>
+      <h3 class="family">🧠 Quiz à thèmes <small>cochez un ou plusieurs thèmes, puis lancez</small></h3>
+      <div class="theme-menu" id="theme-menu"></div>
+      <div class="theme-launch" id="theme-launch">
+        <span id="theme-count">Aucun thème choisi</span>
+        <button class="chip" type="button" id="theme-clear">Tout décocher</button>
+        <a class="btn gold big" id="theme-go" aria-disabled="true">🧠 Lancer le quiz</a>
+      </div>
 
       <h3 class="family">⚡ Parties rapides <small>un seul jeu, 5 à 15 minutes</small></h3>
       <div class="tile-grid" id="quick-grid"></div>
@@ -81,8 +86,23 @@
       mode = b.dataset.mode;
       showCard.href = link('format=show');
       document.querySelectorAll('.tile').forEach((t) => { t.href = link(`format=quick&game=${t.dataset.game}`); });
-      document.querySelectorAll('.theme-tile').forEach((t) => { t.href = link(`format=quick&game=quiz&themes=${t.dataset.themes}`); });
+      paintThemes();
     }));
+
+    // Thèmes cochés dans le menu (gardés pour la prochaine visite).
+    const chosen = new Set((() => { try { return JSON.parse(localStorage.getItem('showtime-themes')) || []; } catch { return []; } })());
+    function paintThemes() {
+      document.querySelectorAll('.theme-tile[data-theme]').forEach((b) => { const on = chosen.has(b.dataset.theme); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+      const n = chosen.size;
+      document.getElementById('theme-count').textContent = n ? `${n} thème${n > 1 ? 's' : ''} choisi${n > 1 ? 's' : ''}` : 'Aucun thème choisi';
+      const go = document.getElementById('theme-go');
+      go.setAttribute('aria-disabled', String(!n));
+      go.href = n ? link(`format=quick&game=quiz&themes=${[...chosen].join(',')}`) : '#';
+      document.getElementById('theme-launch').classList.toggle('ready', n > 0);
+      try { localStorage.setItem('showtime-themes', JSON.stringify([...chosen])); } catch { /* */ }
+    }
+    document.getElementById('theme-clear').addEventListener('click', () => { chosen.clear(); paintThemes(); });
+    document.getElementById('theme-go').addEventListener('click', (e) => { if (!chosen.size) { e.preventDefault(); alert('Cochez au moins un thème !'); } });
 
     function tile(g) {
       const a = document.createElement('a');
@@ -101,24 +121,40 @@
       document.getElementById('quick-grid').append(...c.quick.map(tile));
       document.getElementById('board-grid').append(...c.board.map(tile));
       document.getElementById('cards-grid').append(...c.cards.map(tile));
-      // Une carte par thème de quiz, plus un « mélange » tout public.
-      const themeTile = (keys, icon, label, adult) => {
-        const a = document.createElement('a');
-        a.className = `theme-tile${adult ? ' adult' : ''}`;
-        a.dataset.themes = keys;
-        a.href = link(`format=quick&game=quiz&themes=${keys}`);
-        const i = document.createElement('span'); i.textContent = icon;
-        const b = document.createElement('b'); b.textContent = label;
-        a.append(i, b);
-        if (adult) {
-          const s = document.createElement('small'); s.textContent = '🔞 Adultes'; a.append(s);
-          a.addEventListener('click', (e) => { if (!confirm('🔞 Quiz coquin réservé aux adultes (jamais vulgaire). Tous les joueurs sont-ils majeurs ?')) e.preventDefault(); });
-        }
-        return a;
-      };
-      const tiles = [themeTile('culture,musique,cinema,sport,foot', '🎲', 'Le grand mélange')];
-      Object.entries(c.themes).forEach(([k, t]) => tiles.push(themeTile(k, t.icon, t.label, t.adult)));
-      document.getElementById('theme-grid').append(...tiles);
+      // Menu des thèmes : on coche un ou plusieurs thèmes, rangés par famille, puis on lance.
+      const groups = {};
+      Object.entries(c.themes).forEach(([k, t]) => { (groups[t.group] = groups[t.group] || []).push([k, t]); });
+      const menu = document.getElementById('theme-menu');
+      const mk = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; if (text) el.textContent = text; return el; };
+      const mix = mk('button', 'theme-tile mix');
+      mix.type = 'button';
+      mix.append(mk('span', '', '🎲'), mk('b', '', 'Le grand mélange'), mk('small', 'mix-sub', 'culture, musique, cinéma, sport, foot'));
+      mix.addEventListener('click', () => { chosen.clear(); ['culture', 'musique', 'cinema', 'sport', 'foot'].forEach((k) => chosen.add(k)); paintThemes(); });
+      menu.append(mix);
+      Object.entries(groups).forEach(([g, list]) => {
+        const box = mk('div', 'theme-family');
+        box.append(mk('h4', '', g));
+        const grid = mk('div', 'theme-grid');
+        list.forEach(([k, t]) => {
+          const b = mk('button', `theme-tile${t.adult ? ' adult' : ''}`);
+          b.type = 'button';
+          b.dataset.theme = k;
+          b.append(mk('span', '', t.icon), mk('b', '', t.label));
+          if (t.adult) b.append(mk('small', '', '🔞 Adultes'));
+          b.addEventListener('click', () => {
+            if (chosen.has(k)) chosen.delete(k);
+            else {
+              if (t.adult && !confirm('🔞 Questions coquines réservées aux adultes (jamais vulgaires). Tous les joueurs sont-ils majeurs ?')) return;
+              chosen.add(k);
+            }
+            paintThemes();
+          });
+          grid.append(b);
+        });
+        box.append(grid);
+        menu.append(box);
+      });
+      paintThemes();
     });
 
     const code = document.getElementById('code');

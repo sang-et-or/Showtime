@@ -26,9 +26,13 @@ Jetons et argent toujours **virtuels**.
 **✋ Je suis prêt** : dans le salon, chaque joueur se déclare prêt sur son téléphone ; quand tout le monde l'est,
 un compte à rebours de 10 s lance la partie (l'hôte peut l'arrêter, ou relancer les retardataires avec « 📣 Qui est prêt ? »).
 
-**🧠 Quiz à thèmes** (près de 250 questions) : Culture générale, Géographie, Histoire, Cuisine, Hauts-de-France, Musique,
-Cinéma, Télé & séries, Jeux vidéo, Années 80 / 90 / 2000, Sport, Football, Foot insolite, **Clubs de L1** (18 clubs, à cocher),
-et **Coquin 🔞** (désactivé par défaut, confirmation « joueurs majeurs », jamais vulgaire, aucune rumeur sur des personnes réelles).
+**🧠 Quiz à thèmes** (350 questions, 25 thèmes à cocher dans le menu d'accueil) :
+- **Sport** : Sport général, Football, Foot insolite, Clubs de L1 (18 clubs), Vie des stars du foot (faits publics uniquement), Rugby, Tennis, Sports divers
+- **Époques** : Années 80, 90, 2000 · **Culture** : Culture générale, Géographie, Histoire, Cuisine, Hauts-de-France, Animaux, Sciences & espace, Expressions françaises
+- **Divertissement** : Musique, Cinéma, Télé & séries, Jeux vidéo · **Société** : Politique & institutions (faits neutres)
+- **Pour adultes** : Coquin 🔞 (désactivé par défaut, confirmation « joueurs majeurs », jamais vulgaire, rien sur des personnes réelles)
+- À distance, les joueurs qui votent pour le quiz cochent aussi leurs thèmes préférés : les plus demandés sont retenus.
+
 
 Et partout : QR code et code à 4 lettres, prénoms et avatars, classements animés, **Grande Finale**
 avec compte à rebours, podium et confettis, animateur virtuel « Max Paillettes » (textes + voix),

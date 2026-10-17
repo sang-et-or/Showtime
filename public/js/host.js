@@ -331,7 +331,8 @@ const VIEWS = {
             h('b', { text: st.tally.length ? `${st.tally[0].icon} ${st.tally[0].title} en tête !` : 'Votez sur vos téléphones !' }),
             h('span', { text: `${st.voters} / ${online} ont voté · le jeu le plus voté sera lancé (égalité : tirage au sort)` }),
             h('div', { class: 'tally' }, ...st.tally.slice(0, 6).map((t) => h('div', { class: 'tally-row' },
-              h('span', { text: `${t.icon} ${t.title}` }), h('i', { style: `width:${Math.round((t.n / Math.max(1, st.voters)) * 100)}%` }), h('b', { text: String(t.n) })))))) : null;
+              h('span', { text: `${t.icon} ${t.title}` }), h('i', { style: `width:${Math.round((t.n / Math.max(1, st.voters)) * 100)}%` }), h('b', { text: String(t.n) })))),
+            st.themeTally.length ? h('span', { class: 'theme-votes', text: `🧠 Thèmes demandés : ${st.themeTally.map((t) => `${t.icon} ${t.label} (${t.n})`).join(' · ')}` }) : '')) : null;
         settings.replaceChildren(
           voteHero || hero,
           se.format === 'show' && !se.vote
