@@ -25,6 +25,7 @@ document.addEventListener('pointerdown', () => SFX.unlock(), { once: true });
 socket.on('connect', () => {
   $('.offline-banner')?.remove();
   const ident = read(STORE);
+  if (code) Organizer.resume(code); // ce téléphone anime-t-il ce salon (mode téléphones seulement) ?
   if (ident && ident.code === code && ident.playerId) {
     socket.emit('player:resume', ident, (res) => {
       if (res.error) { localStorage.removeItem(STORE); showJoin(); }
@@ -147,8 +148,9 @@ function showJoin(errorMsg) {
   const submit = h('button', { class: 'btn gold big', type: 'submit' }, 'Entrer sur le plateau ✨');
   const accountBox = h('div', { class: 'account-box' });
   const form = h('form', { class: 'pview', novalidate: true },
-    h('div', { style: 'text-align:center' }, h('div', { class: 'logo', style: 'font-size:2.6rem', text: 'SHOWTIME' }), h('p', { text: 'Ce soir, c’est toi la star !' })),
-    h('div', { class: `field${code.length === 4 ? ' hidden' : ''}` }, h('label', { for: 'f-code', text: 'Code du salon (affiché à l’écran)' }), codeInput),
+    h('div', { style: 'text-align:center' }, h('div', { class: 'logo', style: 'font-size:2.6rem', text: 'SHOWTIME' }),
+      h('p', { text: Organizer.creating() ? '👑 Tu organises la partie ! Entre ton prénom : tu pourras ensuite inviter tes amis.' : 'Ce soir, c’est toi la star !' })),
+    h('div', { class: `field${code.length === 4 || Organizer.creating() ? ' hidden' : ''}` }, h('label', { for: 'f-code', text: 'Code du salon (affiché à l’écran)' }), codeInput),
     h('div', { class: 'field' }, h('label', { for: 'f-name', text: 'Ton prénom de star' }), nameInput),
     h('div', { class: 'field' }, h('label', { text: 'Ton avatar' }), grid),
     err, submit, accountBox);
@@ -166,9 +168,16 @@ function showJoin(errorMsg) {
     if (joining) return;
     SFX.unlock();
     const name = nameInput.value.trim();
+    if (!name) { err.textContent = 'Il nous faut ton prénom !'; err.classList.remove('hidden'); nameInput.focus(); return; }
+    if (Organizer.creating()) {
+      // Mode téléphones seulement : on crée d'abord le salon (ce téléphone en est l'animateur), puis on le rejoint.
+      joining = true; submit.disabled = true;
+      Organizer.create().then((roomCode) => { joining = false; codeInput.value = roomCode; form.requestSubmit(); })
+        .catch((ex) => { joining = false; submit.disabled = false; err.textContent = ex.message; err.classList.remove('hidden'); });
+      return;
+    }
     const c = codeInput.value.trim();
     if (c.length !== 4) { err.textContent = 'Le code fait 4 lettres.'; err.classList.remove('hidden'); return; }
-    if (!name) { err.textContent = 'Il nous faut ton prénom !'; err.classList.remove('hidden'); nameInput.focus(); return; }
     joining = true; submit.disabled = true;
     socket.emit('player:join', { code: c, name, avatar }, (res) => {
       joining = false; submit.disabled = false;

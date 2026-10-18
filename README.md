@@ -332,3 +332,15 @@ On les trouve dans la famille « 📺 Jeux télé » de l’accueil et du menu d
 Dans la famille « 🔞 Pour adultes ». À deux exactement, chacun sur son téléphone : on choisit **Action** ou **Vérité**, et la température monte au fil des tours (🌶️ sensuel → 🌶️🌶️ coquin → 🌶️🌶️🌶️ osé), sans dépasser le niveau choisi dans le salon (« Jusqu’à… »).
 Consentement : joker toujours possible, et le partenaire peut répondre **« Pas ce soir 🙅 »** à n’importe quelle action, sans pénalité.
 Confidentialité : comme pour « Entre nous », l’écran principal ne montre jamais les cartes, rien n’est enregistré et les photos sont désactivées. Confirmation 18+ à l’ouverture.
+
+## 11. Deux façons de jouer : présentiel ou téléphones seulement
+Sur l’accueil, choisissez votre mode avant de lancer un jeu :
+
+- **📺 Présentiel, avec un écran principal** : l’ordinateur ou la télé affiche le plateau et un QR code ; chacun scanne avec son téléphone.
+- **📱 Téléphones seulement, à distance** : pas besoin d’écran. L’organisateur choisit un jeu **sur son téléphone**, entre son prénom : il devient à la fois **joueur et animateur**.
+  - Barre d’animateur (dans le salon) : **📤 Inviter** (partage du lien par SMS, WhatsApp…), **choix du jeu** et de la durée, **🚀 Lancer**.
+  - Pendant la partie : bouton **👑** pour ⏭ Suivant, ⏸ Pause, 🏁 Finale, 🏠 retour au salon.
+  - Chaque téléphone affiche l’écran du jeu en haut (« ✕ Masquer » pour le cacher) et ses boutons de jeu en bas ; le chat 💬 est disponible.
+  - Si l’organisateur recharge la page, il retrouve ses commandes.
+
+Sur un téléphone, l’accueil propose d’office le mode « Téléphones seulement » ; le choix est mémorisé.

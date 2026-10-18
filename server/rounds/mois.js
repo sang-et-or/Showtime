@@ -1,4 +1,4 @@
-// Jeu de parcours « Fin de Mois » (inspiré des jeux de « calendrier et budget »,
+﻿// Jeu de parcours « Fin de Mois » (inspiré des jeux de « calendrier et budget »,
 // avec notre propre calendrier, nos événements et nos règles).
 // On avance jour après jour dans le mois : factures, courrier, bonnes affaires, loto, amendes…
 // Le jour de paie, on touche son salaire et on revend ses bonnes affaires. Argent fictif uniquement.
@@ -57,6 +57,7 @@ module.exports = createTrackGame({
   sides: 6,
   currency: '€',
   cols: 7,
+  moveMs: (steps) => 1_000 + steps * 330 + 900, // le dé roule, puis le pion avance jour après jour
   introLine: () => animator.moisIntro(),
   turnLine: (name) => pick([`${name}, lance le dé !`, `À toi, ${name} ! Quelle surprise dans ta boîte aux lettres ?`]),
   endLine: (name) => `Les comptes sont faits ! ${name} termine avec le plus beau budget !`,

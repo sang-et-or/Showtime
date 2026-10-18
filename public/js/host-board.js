@@ -336,23 +336,29 @@ function vieScene(T) {
     if (sq.type !== 'event' && sq.type !== 'paie') plane.append(h('div', { class: `v3-bb v3-sign t-${sq.type}`, style: pct([pts[i][0], pts[i][1] - 4.6]) }, h('b', { text: `${sq.icon} ${sq.label}` })));
     return t;
   });
-  // Taille : le plateau prend toute la place disponible (unité --u = 1 % de sa largeur).
+  fitPlane(stage, plane, 1.3);
+  return { el: stage, update: pawnLayer(plane, pts, V3.H, tiles, V3.wheelDelay) };
+}
+
+/** Le plateau prend toute la place disponible (unité --u = 1 % de sa largeur). */
+function fitPlane(stage, plane, ratio) {
   new ResizeObserver(() => {
-    const w = Math.max(10, Math.min(stage.clientWidth * 0.84, stage.clientHeight > 60 ? stage.clientHeight * 1.3 : Infinity));
+    const w = Math.max(10, Math.min(stage.clientWidth * 0.84, stage.clientHeight > 60 ? stage.clientHeight * ratio : Infinity));
     plane.style.setProperty('--pw', `${w}px`);
     plane.style.setProperty('--u', `${w / 100}px`);
   }).observe(stage);
+}
 
+/** Pions debout qui avancent case par case (commun aux plateaux en perspective). */
+function pawnLayer(plane, pts, H, tiles, delay) {
   const pawns = new Map(); // id → { el, shown, timers }
   function placePawn(p, pos, slot) {
     const [x, y] = pts[pos];
     const a = (slot * 2.4);
     p.el.style.left = `${x + (slot ? Math.cos(a) * 2.2 : 0)}%`;
-    p.el.style.top = `${((y + (slot ? Math.sin(a) * 1.6 : 0)) / V3.H) * 100}%`;
+    p.el.style.top = `${((y + (slot ? Math.sin(a) * 1.6 : 0)) / H) * 100}%`;
   }
-  return {
-    el: stage,
-    update(st, cur) {
+  return function update(st, cur) {
       const TT = st.track;
       const slots = new Map();
       TT.seats.forEach((seat) => {
@@ -375,15 +381,95 @@ function vieScene(T) {
               p.el.classList.remove('hop'); void p.el.offsetWidth; p.el.classList.add('hop');
               tiles[k].classList.add('lit'); setTimeout(() => tiles[k].classList.remove('lit'), 500);
               SFX.blip();
-            }, V3.wheelDelay + (k - from - 1) * V3.stepMs));
+            }, delay + (k - from - 1) * V3.stepMs));
           }
-          p.timers.push(setTimeout(() => { placePawn(p, to, slot); p.timers = []; }, V3.wheelDelay + (to - from) * V3.stepMs + 150));
+          p.timers.push(setTimeout(() => { placePawn(p, to, slot); p.timers = []; }, delay + (to - from) * V3.stepMs + 150));
         } else if (seat.pos !== p.shown || !p.timers.length) {
           p.timers.forEach(clearTimeout); p.timers = [];
           p.shown = seat.pos;
           placePawn(p, seat.pos, slot);
         }
       });
+  };
+}
+
+// =====================================================================
+// Fin de Mois : le calendrier du mois posé sur un plateau de jeu, vu en hauteur
+// =====================================================================
+const M3 = { H: 82, x0: 5, x1: 95, y0: 24, y1: 78, cols: 7, rows: 5, diceDelay: 900 };
+const MOIS_DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+function moisScene(T) {
+  const plane = h('div', { class: 'v3-plane m3-plane', style: `--tilt:44deg;aspect-ratio:100/${M3.H}` });
+  const stage = h('div', { class: 'v3-stage' }, plane);
+  const cw = (M3.x1 - M3.x0) / M3.cols;
+  const ch = (M3.y1 - M3.y0) / M3.rows;
+  const pct = ([x, y]) => `left:${x}%;top:${(y / M3.H) * 100}%`;
+  // Case 0 = « Début du mois », posée en haut à gauche ; jours 1 à 31 rangés comme un vrai calendrier.
+  const pts = T.board.map((sq, i) => (i === 0 ? [M3.x0 + cw * 0.9, 9] : [M3.x0 + cw * (((i - 1) % 7) + 0.5), M3.y0 + ch * (Math.floor((i - 1) / 7) + 0.5)]));
+  const potBox = h('div', { class: 'm3-pots' });
+  plane.append(h('i', { class: 'v3-edge m3-edge' }),
+    h('div', { class: 'm3-title', style: pct([60, 9]) }, h('b', { text: '📅 FIN DE MOIS' }), potBox),
+    ...MOIS_DAYS.map((d, k) => h('div', { class: `m3-wd${k >= 5 ? ' we' : ''}`, style: `${pct([M3.x0 + cw * (k + 0.5), M3.y0 - 2.6])};width:calc(var(--u) * ${cw - 0.8})`, text: d })));
+  const tiles = T.board.map((sq, i) => {
+    const size = i === 0 ? `width:calc(var(--u) * ${cw * 1.5});height:calc(var(--u) * ${ch * 1.15})` : `width:calc(var(--u) * ${cw - 0.8});height:calc(var(--u) * ${ch - 0.8})`;
+    const t = h('div', { class: `m3-tile t-${sq.type}`, style: `${pct(pts[i])};${size}` },
+      h('b', { class: 'm3-day', text: i === 0 ? '' : String(sq.day) }), h('span', { text: sq.icon }), h('small', { text: i === 0 ? 'Début du mois' : sq.label }));
+    plane.append(t);
+    return t;
+  });
+  // Décor posé sur le plateau : la banque, la tirelire, des billets, le courrier…
+  [['🏦', 92, 4, 1.5], ['🐷', 6, 80, 1.2], ['💶', 20, 80.5, 1], ['🪙', 33, 80.5, 0.9], ['✉️', 80, 80.5, 1], ['🧾', 92, 80.5, 0.9]].forEach(([e, x, y, sc]) => plane.append(h('div', { class: 'v3-bb v3-decor', style: `${pct([x, y])};--s:${sc}`, text: e })));
+  fitPlane(stage, plane, 1.25);
+  const move = pawnLayer(plane, pts, M3.H, tiles, M3.diceDelay);
+  return {
+    el: stage,
+    update(st, cur) {
+      potBox.textContent = st.track.header || '';
+      move(st, cur);
+    },
+  };
+}
+
+/** Écran télé des jeux de parcours en perspective : plateau + lanceur (roue ou dé) + joueurs. */
+function board3dView(root, s, scene, roller, rollText) {
+  const turnBox = h('div', { class: 'turn-box' });
+  const side = h('div', { class: 'side-list' });
+  const clock = h('div', { class: 'game-clock' });
+  const overlay = h('div', { class: 'card-overlay hidden' });
+  const passed = h('div', { class: 'passed-list' });
+  root.append(h('div', { class: 'board-layout' },
+    h('div', { class: 'board-wrap track-wrap v3-wrap' }, scene.el, overlay),
+    h('div', { class: 'board-side' }, turnBox, roller.el, passed, side, clock)));
+  let lastCard = null;
+  return {
+    update(st) {
+      const TT = st.track;
+      const cur = TT.seats[TT.turn];
+      scene.update(st, cur);
+      roller.show(st.stage === 'roll' || st.stage == null ? null : st.roll, `${TT.seq}:${st.roll}`);
+      passed.replaceChildren(...(st.passed || []).map((t) => h('div', { class: 'gain ok rise', text: t })));
+      turnBox.replaceChildren(cur ? avatarEl(cur.player, '') : '',
+        h('div', {}, h('small', { text: 'À toi de jouer' }), h('b', { text: cur?.player.name || '' }),
+          h('small', { text: st.stage === 'roll' ? rollText : st.choice && !st.chosen ? '📱 À toi de choisir…' : '' })));
+      side.replaceChildren(...TT.seats.map((seat, i) => sideRow(seat.player, i === TT.turn, [`${fmt(seat.money)} ${TT.currency}`, seat.summary ? ` · ${seat.summary}` : ''])));
+      clock.textContent = `⏱ ${mmss(TT.endsInMs)} restantes`;
+      if (st.card) {
+        const k = JSON.stringify(st.card) + st.chosen;
+        if (k !== lastCard) {
+          lastCard = k;
+          if (st.card.tone === 'good') SFX.correct(); else if (st.card.tone === 'bad') SFX.wrong(); else SFX.reveal();
+        }
+        overlay.classList.remove('hidden');
+        overlay.replaceChildren(h('div', { class: `event-card tone-${st.card.tone} pop` },
+          h('div', { class: 'ev-icon', text: st.card.icon }), h('h2', { text: st.card.title }), h('p', { text: st.card.text }),
+          st.card.delta ? h('div', { class: `ev-delta ${st.card.delta > 0 ? 'plus' : 'minus'}`, text: `${st.card.delta > 0 ? '+' : '−'}${fmt(Math.abs(st.card.delta))} ${TT.currency}` }) : '',
+          st.choice ? h('div', { class: 'ev-choice' }, h('span', { class: 'chip', text: st.choice.yes }), h('b', { text: 'ou' }), h('span', { class: 'chip', text: st.choice.no }),
+            h('small', { text: `📱 ${cur?.player.name || ''} choisit sur son téléphone` })) : ''));
+      } else {
+        overlay.classList.add('hidden');
+        lastCard = null;
+      }
     },
   };
 }
@@ -395,6 +481,7 @@ function trackBoardView(root, s) {
   SFX.whoosh();
   const T = s.track;
   if (T.id === 'vie') return vieBoardView(root, s);
+  if (T.id === 'mois') return board3dView(root, s, moisScene(T), diceEl(), '📱 Lance le dé !');
   const grid = h('div', { class: `track-grid ${T.id}`, style: `--cols:${T.cols}` });
   const cells = [];
   const order = T.id === 'mois' ? T.board.slice(1) : T.board; // le calendrier commence au jour 1
@@ -471,49 +558,7 @@ function trackBoardView(root, s) {
 }
 
 /** Écran télé du Chemin de la Vie : plateau en perspective + roue de la vie + joueurs. */
-function vieBoardView(root, s) {
-  const scene = vieScene(s.track);
-  const wheel = lifeWheel();
-  const turnBox = h('div', { class: 'turn-box' });
-  const side = h('div', { class: 'side-list' });
-  const clock = h('div', { class: 'game-clock' });
-  const overlay = h('div', { class: 'card-overlay hidden' });
-  const passed = h('div', { class: 'passed-list' });
-  root.append(h('div', { class: 'board-layout' },
-    h('div', { class: 'board-wrap track-wrap v3-wrap' }, scene.el, overlay),
-    h('div', { class: 'board-side' }, turnBox, wheel.el, passed, side, clock)));
-  let lastCard = null;
-  return {
-    update(st) {
-      const TT = st.track;
-      const cur = TT.seats[TT.turn];
-      scene.update(st, cur);
-      wheel.show(st.stage === 'roll' || st.stage == null ? null : st.roll, `${TT.seq}:${st.roll}`);
-      passed.replaceChildren(...(st.passed || []).map((t) => h('div', { class: 'gain ok rise', text: t })));
-      turnBox.replaceChildren(cur ? avatarEl(cur.player, '') : '',
-        h('div', {}, h('small', { text: 'À toi de jouer' }), h('b', { text: cur?.player.name || '' }),
-          h('small', { text: st.stage === 'roll' ? '📱 Fais tourner la roue !' : st.choice && !st.chosen ? '📱 À toi de choisir…' : '' })));
-      side.replaceChildren(...TT.seats.map((seat, i) => sideRow(seat.player, i === TT.turn, [`${fmt(seat.money)} ${TT.currency}`, seat.summary ? ` · ${seat.summary}` : ''])));
-      clock.textContent = `⏱ ${mmss(TT.endsInMs)} restantes`;
-      if (st.card) {
-        const k = JSON.stringify(st.card) + st.chosen;
-        if (k !== lastCard) {
-          lastCard = k;
-          if (st.card.tone === 'good') SFX.correct(); else if (st.card.tone === 'bad') SFX.wrong(); else SFX.reveal();
-        }
-        overlay.classList.remove('hidden');
-        overlay.replaceChildren(h('div', { class: `event-card tone-${st.card.tone} pop` },
-          h('div', { class: 'ev-icon', text: st.card.icon }), h('h2', { text: st.card.title }), h('p', { text: st.card.text }),
-          st.card.delta ? h('div', { class: `ev-delta ${st.card.delta > 0 ? 'plus' : 'minus'}`, text: `${st.card.delta > 0 ? '+' : '−'}${fmt(Math.abs(st.card.delta))} ${TT.currency}` }) : '',
-          st.choice ? h('div', { class: 'ev-choice' }, h('span', { class: 'chip', text: st.choice.yes }), h('b', { text: 'ou' }), h('span', { class: 'chip', text: st.choice.no }),
-            h('small', { text: `📱 ${cur?.player.name || ''} choisit sur son téléphone` })) : ''));
-      } else {
-        overlay.classList.add('hidden');
-        lastCard = null;
-      }
-    },
-  };
-}
+function vieBoardView(root, s) { return board3dView(root, s, vieScene(s.track), lifeWheel(), '📱 Fais tourner la roue !'); }
 
 function trackEnd(root, s) {
   SFX.fanfare(); SFX.applause(2);

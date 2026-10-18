@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=22">
+  <link rel="stylesheet" href="/css/style.css?v=28">
 </head>
 <body>
   <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -26,11 +26,21 @@
 
     <section class="host-zone">
       <div class="zone-head">
-        <h2>📺 Lancer une soirée sur cet écran</h2>
-        <p class="zone-note">📱 Chaque joueur joue avec son téléphone — dans la même pièce ou à distance, c’est pareil !</p>
+        <h2>🎬 Lancer une soirée</h2>
+        <p class="zone-note">📱 Chaque joueur joue avec son téléphone. Choisissez comment vous jouez :</p>
+      </div>
+      <div class="play-mode" role="radiogroup" aria-label="Comment jouez-vous ?">
+        <button type="button" class="pm-card" data-mode="screen" role="radio">
+          <span class="pm-ic">📺</span>
+          <span class="pm-txt"><b>Présentiel, avec un écran principal</b><small>Ordinateur ou télé au centre, un QR code à scanner. Idéal quand on est réunis.</small></span>
+        </button>
+        <button type="button" class="pm-card" data-mode="phones" role="radio">
+          <span class="pm-ic">📱</span>
+          <span class="pm-txt"><b>Téléphones seulement, à distance</b><small>Pas besoin d’écran : vous créez la partie sur votre téléphone, vous envoyez le lien, chacun voit le jeu sur son téléphone.</small></span>
+        </button>
       </div>
 
-      <a class="show-card" id="show-card" href="/host?new=1&format=show">
+      <a class="show-card" id="show-card" data-launch="format=show" href="/host?new=1&format=show">
         <span class="show-ic">🎬</span>
         <span class="show-txt">
           <b>Le Grand Show</b>
@@ -40,28 +50,24 @@
         <span class="btn gold big">Lancer le show</span>
       </a>
 
-      <h3 class="family">🧠 Quiz à thèmes <small>cochez un ou plusieurs thèmes, puis lancez</small></h3>
+      <nav class="home-jump" aria-label="Aller à">
+        <a href="#game-picker">🎮 Tous les jeux</a><a href="#quiz-themes">🧠 Quiz à thèmes</a>
+      </nav>
+
+      <!-- Choix des jeux : filtres, recherche, vignettes d'aperçu (rempli par home-games.js) -->
+      <div id="game-picker" class="game-picker"></div>
+
+      <!-- Quiz à thèmes : dans son propre bloc, pour que la barre « Lancer le quiz » ne recouvre pas les autres jeux -->
+      <div class="quiz-zone">
+      <h3 class="family" id="quiz-themes">🧠 Quiz à thèmes <small>cochez un ou plusieurs thèmes, puis lancez</small></h3>
       <div class="theme-menu" id="theme-menu"></div>
       <div class="theme-launch" id="theme-launch">
         <span id="theme-count">Aucun thème choisi</span>
         <button class="chip" type="button" id="theme-clear">Tout décocher</button>
         <a class="btn gold big" id="theme-go" aria-disabled="true">🧠 Lancer le quiz</a>
       </div>
+      </div>
 
-      <h3 class="family">⚡ Parties rapides <small>un seul jeu, 5 à 15 minutes</small></h3>
-      <div class="tile-grid" id="quick-grid"></div>
-
-      <h3 class="family">📺 Jeux télé <small>comme à la télé, avec nos propres règles</small></h3>
-      <div class="tile-grid" id="tv-grid"></div>
-
-      <h3 class="family">🎲 Jeux de plateau <small>dés, pions et coups bas</small></h3>
-      <div class="tile-grid" id="board-grid"></div>
-
-      <h3 class="family">🃏 Jeux de cartes <small>vos cartes restent cachées sur votre téléphone</small></h3>
-      <div class="tile-grid" id="cards-grid"></div>
-
-      <h3 class="family">🔞 Pour adultes <small>jeu privé pour les couples, rien n’est enregistré</small></h3>
-      <div class="tile-grid" id="adult-grid"></div>
     </section>
 
     <section class="how">
@@ -81,8 +87,30 @@
   </main>
 
   <script>
+    // Mode de jeu : « screen » (présentiel avec écran principal) ou « phones » (téléphones seulement, à distance).
+    window.ShowMode = (() => {
+      let mode = 'screen';
+      try { mode = localStorage.getItem('showtime-mode') || (matchMedia('(max-width: 720px)').matches ? 'phones' : 'screen'); } catch { /* */ }
+      const api = {
+        get: () => mode,
+        link: (params) => (mode === 'phones' ? `/play?create=1&${params}` : `/host?new=1&${params}`),
+        refresh() {
+          document.querySelectorAll('[data-launch]').forEach((a) => { a.href = api.link(a.dataset.launch); });
+          document.querySelectorAll('.pm-card').forEach((b) => { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+          document.body.classList.toggle('mode-phones', mode === 'phones');
+          window.dispatchEvent(new Event('showmode'));
+        },
+        set(m) { mode = m; try { localStorage.setItem('showtime-mode', m); } catch { /* */ } api.refresh(); },
+      };
+      document.querySelectorAll('.pm-card').forEach((b) => b.addEventListener('click', () => api.set(b.dataset.mode)));
+      api.refresh();
+      return api;
+    })();
+  </script>
+  <script src="/js/home-games.js?v=28"></script>
+  <script>
     // Un seul mode : chaque joueur a son téléphone (même pièce ou à distance).
-    const link = (params) => `/host?new=1&${params}`;
+    const link = (params) => window.ShowMode.link(params);
 
     // Thèmes cochés dans le menu (gardés pour la prochaine visite).
     const chosen = new Set((() => { try { return JSON.parse(localStorage.getItem('showtime-themes')) || []; } catch { return []; } })());
@@ -97,27 +125,12 @@
       try { localStorage.setItem('showtime-themes', JSON.stringify([...chosen])); } catch { /* */ }
     }
     document.getElementById('theme-clear').addEventListener('click', () => { chosen.clear(); paintThemes(); });
+    window.addEventListener('showmode', () => paintThemes());
     document.getElementById('theme-go').addEventListener('click', (e) => { if (!chosen.size) { e.preventDefault(); alert('Cochez au moins un thème !'); } });
 
-    function tile(g) {
-      const a = document.createElement('a');
-      a.className = 'tile';
-      a.dataset.game = g.id;
-      a.href = link(`format=quick&game=${g.id}`);
-      const add = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; el.textContent = text; a.append(el); return el; };
-      add('span', 'tile-ic', g.icon);
-      add('b', '', g.title);
-      add('span', 'tile-pitch', g.pitch);
-      add('small', 'tile-meta', `👥 ${g.players || '1 à 12 joueurs'} · ⏱ ${g.duration || '10 min'}`);
-      add('span', 'tile-go', 'Jouer ▶');
-      return a;
-    }
+
     fetch('/api/catalog').then((r) => r.json()).then((c) => {
-      document.getElementById('quick-grid').append(...c.quick.map(tile));
-      document.getElementById('tv-grid').append(...c.tv.map(tile));
-      document.getElementById('board-grid').append(...c.board.map(tile));
-      document.getElementById('cards-grid').append(...c.cards.map(tile));
-      document.getElementById('adult-grid').append(...c.adult.map((g) => { const t = tile(g); t.classList.add('adult-tile'); t.addEventListener('click', (e) => { if (!confirm('🔞 Jeu privé réservé aux adultes consentants (2 joueurs).\nRien n’est enregistré. Continuer ?')) e.preventDefault(); }); return t; }));
+      window.buildGamePicker(c, document.getElementById('game-picker'));
       // Menu des thèmes : on coche un ou plusieurs thèmes, rangés par famille, puis on lance.
       const groups = {};
       Object.entries(c.themes).forEach(([k, t]) => { (groups[t.group] = groups[t.group] || []).push([k, t]); });
