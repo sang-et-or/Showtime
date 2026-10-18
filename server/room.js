@@ -41,6 +41,7 @@ class Room {
       categories: [...DEFAULT_CATEGORIES],
       clubs: [], // vide = tous les clubs
       photos: true, // les joueurs peuvent prendre des photos souvenirs
+      chat: true, // chat entre joueurs (parties à distance)
       vote: false, // les joueurs votent pour le jeu (activé d'office à distance)
       coupleLevel: 'douceur', // niveau du jeu de couple « Entre nous »
     };
@@ -57,6 +58,9 @@ class Room {
     this.timerVisible = false;
     this.pendingNext = null;
     this.paused = null; // { by, at, until, fn, remaining, total, visible } pendant une pause
+    this.chatLog = []; // derniers messages du chat (parties à distance)
+    this.chatSeq = 0;
+    this.chatLast = new Map(); // anti-spam : dernier message par joueur
     this.pauseTimer = null;
     this.line = { id: 0, text: '' };
     this.snapshot = new Map(); // pid -> { rank, score } au dernier classement affiché
@@ -356,6 +360,7 @@ class Room {
     }
     if (Array.isArray(s.clubs)) se.clubs = [...new Set(s.clubs.filter((c) => CLUBS[c]))];
     if (typeof s.photos === 'boolean') se.photos = s.photos;
+    if (typeof s.chat === 'boolean') se.chat = s.chat;
     if (typeof s.vote === 'boolean') se.vote = s.vote;
     this.checkReady();
     this.sync();
@@ -420,6 +425,29 @@ class Room {
     this.memorizeGame(mod);
     if (mod.prep || !remaining) { this.nextRound(); return; }
     this.goLeaderboard(`Après « ${mod.title} »`, () => this.nextRound());
+  }
+
+  // ---------- chat entre joueurs à distance ----------
+  chatOn() { return this.settings.mode === 'remote' && this.settings.chat; }
+
+  /** Un joueur écrit dans le chat : texte nettoyé, 1 message par seconde au plus, 60 derniers messages gardés. */
+  sendChat(p, text) {
+    if (!this.chatOn()) return;
+    const clean = String(text ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!clean) return;
+    const now = Date.now();
+    if (now - (this.chatLast.get(p.id) || 0) < 1_000) return;
+    this.chatLast.set(p.id, now);
+    const msg = { id: ++this.chatSeq, who: this.publicPlayer(p), text: clean, at: now };
+    this.chatLog.push(msg);
+    if (this.chatLog.length > 60) this.chatLog.shift();
+    this.touch();
+    for (const pl of this.players.values()) if (pl.connected && pl.socketId) this.send(pl.socketId, 'chat', msg);
+    // Sur l'écran principal (et les mini-écrans), jamais pendant un jeu privé pour adultes.
+    if (!this.isPrivate()) {
+      if (this.hostSocket) this.send(this.hostSocket, 'chat', msg);
+      for (const sid of this.spectators) this.send(sid, 'chat', msg);
+    }
   }
 
   // ---------- pause ----------
@@ -558,6 +586,7 @@ class Room {
       line: this.settings.mode === 'remote' ? this.line : null,
       photos: this.settings.photos && !this.isPrivate(), account: !!p.userId, private: this.isPrivate(),
       paused: this.pauseInfo(), canPause: this.phase !== 'lobby' && this.phase !== 'final',
+      chat: this.chatOn(),
     };
     switch (this.phase) {
       case 'lobby': {

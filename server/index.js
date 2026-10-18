@@ -226,6 +226,14 @@ io.on('connection', (socket) => {
   // Toutes les actions de jeu passent par un seul message : { type: 'answer' | 'vote' | 'letter' | … }.
   socket.on('player:act', playerAction((room, p, msg) => room.act(p, msg)));
   socket.on('player:leave', playerAction((room, p) => room.kick(p.id)));
+  // Chat entre joueurs à distance (texte libre ou réaction rapide).
+  socket.on('chat:send', playerAction((room, p, msg) => room.sendChat(p, msg.text)));
+  socket.on('chat:history', (msg, cb) => {
+    const room = roomOfSocket();
+    if (!room || typeof cb !== 'function') return;
+    const allowed = socket.data.role === 'player' || (!room.isPrivate() && (socket.data.role === 'host' || socket.data.role === 'spectator'));
+    cb(allowed && room.chatOn() ? room.chatLog : []);
+  });
 
   socket.on('disconnect', () => {
     clearInterval(refill);

@@ -447,3 +447,69 @@ function miniBoard(ranking, meId, max) {
   return h('div', { class: 'mini-board' }, ...top.map((r) => h('div', { class: r.id === meId ? 'me' : '' },
     h('b', { text: `${r.rank}.`, style: 'color:var(--text);width:1.8em;text-align:right' }), avatarEl(r, 'sm'), h('span', { class: 'n', text: r.name }), h('b', { text: fmt(r.score) }))));
 }
+
+// ---------------------------------------------------------------------------
+// 💬 Chat entre joueurs à distance : bouton flottant, pastille des non-lus, réactions rapides.
+// ---------------------------------------------------------------------------
+const Chat = (() => {
+  let msgs = []; let open = false; let unread = 0; let enabled = false; let loaded = false;
+  let btn = null; let panel = null; let list = null; let badge = null; let input = null;
+  const REACTIONS = ['😂', '👏', '🔥', '😱', '❤️', '🤔'];
+  const myId = () => state?.me?.id;
+  const fmtTime = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  function paintBadge() { if (!badge) return; badge.textContent = unread > 9 ? '9+' : String(unread); badge.classList.toggle('hidden', !unread); }
+  function line(m) {
+    const mine = m.who.id === myId();
+    const solo = /^\p{Extended_Pictographic}[️‍\p{Extended_Pictographic}]*$/u.test(m.text);
+    return h('div', { class: `chat-msg${mine ? ' mine' : ''}${solo ? ' emoji' : ''}` }, mine ? '' : avatarEl(m.who, 'sm'),
+      h('div', { class: 'chat-bubble' }, mine ? '' : h('small', { text: m.who.name }), h('span', { text: m.text }), h('time', { text: fmtTime(m.at) })));
+  }
+  function paintList() {
+    if (!list) return;
+    list.replaceChildren(...(msgs.length ? msgs.map(line) : [h('p', { class: 'chat-empty', text: 'Aucun message pour l’instant. Dis bonjour ! 👋' })]));
+    list.scrollTop = list.scrollHeight;
+  }
+  const send = (text) => { const t = String(text || '').trim(); if (!t) return; socket.emit('chat:send', { text: t }); SFX.tap(); };
+  function build() {
+    badge = h('span', { class: 'chat-badge hidden' });
+    btn = h('button', { id: 'chat-btn', class: 'chat-btn', 'aria-label': 'Ouvrir le chat', onclick: () => toggle(true) }, '💬', badge);
+    list = h('div', { class: 'chat-list', 'aria-live': 'polite' });
+    input = h('input', { type: 'text', maxlength: '200', placeholder: 'Ton message…', autocomplete: 'off', enterkeyhint: 'send' });
+    panel = h('div', { class: 'chat-panel hidden', role: 'dialog', 'aria-label': 'Chat des joueurs' },
+      h('div', { class: 'chat-head' }, h('b', { text: '💬 Chat des joueurs' }), h('button', { class: 'chat-close', 'aria-label': 'Fermer le chat', onclick: () => toggle(false) }, '✕')),
+      list,
+      h('div', { class: 'chat-reacts' }, ...REACTIONS.map((r) => h('button', { onclick: () => send(r), 'aria-label': `Réaction ${r}` }, r))),
+      h('form', { class: 'chat-form', onsubmit: (e) => { e.preventDefault(); send(input.value); input.value = ''; input.focus(); } }, input, h('button', { class: 'btn gold', type: 'submit' }, 'Envoyer')));
+    document.body.append(btn, panel);
+  }
+  function toggle(v) {
+    open = v;
+    panel.classList.toggle('hidden', !open);
+    btn.classList.toggle('hidden', open);
+    if (open) { unread = 0; paintBadge(); paintList(); setTimeout(() => input.focus(), 100); }
+  }
+  function preview(m) {
+    const p = h('div', { class: 'chat-preview', onclick: () => { p.remove(); toggle(true); } }, avatarEl(m.who, 'sm'), h('span', {}, h('b', { text: `${m.who.name} : ` }), m.text));
+    document.querySelectorAll('.chat-preview').forEach((x) => x.remove());
+    document.body.append(p);
+    setTimeout(() => p.remove(), 3500);
+  }
+  return {
+    sync(s) {
+      enabled = !!s.chat;
+      if (!enabled) { btn?.remove(); panel?.remove(); btn = panel = null; loaded = false; return; }
+      if (!btn) build();
+      if (!loaded) { loaded = true; socket.emit('chat:history', {}, (log) => { msgs = Array.isArray(log) ? log : []; paintList(); }); }
+    },
+    reset() { loaded = false; },
+    receive(m) {
+      if (!enabled) return;
+      msgs.push(m); if (msgs.length > 60) msgs.shift();
+      if (open) paintList();
+      else if (m.who.id !== myId()) { unread++; paintBadge(); SFX.blip(); buzz(30); preview(m); }
+    },
+  };
+})();
+socket.on('chat', (m) => Chat.receive(m));
+socket.on('disconnect', () => Chat.reset()); // à la reconnexion, on recharge les messages manqués
+socket.on('state', (s) => Chat.sync(s));

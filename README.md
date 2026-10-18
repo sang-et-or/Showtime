@@ -294,6 +294,10 @@ L'offre gratuite de Neon (0,5 Go) permet de garder plusieurs milliers de photos 
   plateaux, cartes). La télé affiche le décompte en direct ; au lancement (bouton de l'hôte ou « tous prêts »), le jeu le plus
   voté est lancé, avec tirage au sort en cas d'égalité. Activé d'office à distance ; l'hôte peut choisir « 🎛️ Je choisis ».
 
+### 💬 Le chat entre joueurs à distance
+En mode « 🌍 À distance », chaque téléphone a un bouton **💬** (avec une pastille pour les messages non lus). On peut écrire des messages (200 caractères maximum, un par seconde au plus) ou envoyer une réaction rapide 😂 👏 🔥 😱 ❤️ 🤔.
+Les messages s’affichent aussi quelques secondes en bulles sur l’écran principal — **sauf pendant les jeux privés pour adultes**, où ils restent sur les téléphones.
+L’animateur peut couper le chat dans le salon (réglage « Chat »). Dans la même pièce, le chat n’apparaît pas.
 ## 9. Jeu privé pour adultes : « Entre nous » 🔥
 
 Un jeu à **deux exactement**, pour les couples, rangé dans la famille « 🔞 Pour adultes » (accueil et « Changer de jeu »).

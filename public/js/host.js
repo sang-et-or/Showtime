@@ -418,6 +418,9 @@ const VIEWS = {
           h('div', { class: 'row' }, h('span', { text: 'Joueurs' }),
             chip('🛋️ Même pièce', se.mode === 'local', () => send({ mode: 'local' })),
             chip('🌍 À distance', se.mode === 'remote', () => send({ mode: 'remote' }))),
+          se.mode === 'remote' ? h('div', { class: 'row' }, h('span', { text: 'Chat' }),
+            chip('💬 Activé', se.chat, () => send({ chat: true })),
+            chip('🔇 Désactivé', !se.chat, () => send({ chat: false }))) : '',
         );
 
         const needed = se.format === 'quick' ? game.min : 1;
@@ -699,3 +702,14 @@ function countUp(el, from, to, ms) {
     if (k < 1) requestAnimationFrame(f);
   }(t0));
 }
+// 💬 Chat des joueurs à distance : les messages s'affichent quelques secondes en bulles sur l'écran principal.
+socket.on('chat', (m) => {
+  if (SPECTATE || !state || state.settings.mode !== 'remote' || !state.settings.chat) return; // le téléphone a déjà son propre chat
+  let stack = $('.chat-stack');
+  if (!stack) { stack = h('div', { class: 'chat-stack', 'aria-live': 'polite' }); document.body.append(stack); }
+  const bubble = h('div', { class: 'chat-toast' }, avatarEl(m.who, 'sm'), h('span', {}, h('b', { text: m.who.name }), ` ${m.text}`));
+  stack.append(bubble);
+  while (stack.children.length > 4) stack.firstChild.remove();
+  SFX.blip();
+  setTimeout(() => { bubble.classList.add('out'); setTimeout(() => bubble.remove(), 500); }, 8000);
+});

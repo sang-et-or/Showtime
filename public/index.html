@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=20">
+  <link rel="stylesheet" href="/css/style.css?v=21">
 </head>
 <body>
   <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -23,13 +23,6 @@
       <p class="tagline">Ce soir, <em>c'est vous les stars !</em></p>
     </header>
 
-    <!-- Les invités, sur leur téléphone, commencent ici -->
-    <form class="join-bar panel" id="join-form">
-      <div class="join-txt"><b>📱 Un salon est déjà ouvert ?</b><span>Tapez le code à 4 lettres affiché à l’écran</span></div>
-      <label class="sr" for="code">Code du salon</label>
-      <input class="code-input" id="code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" required>
-      <button class="btn big" type="submit">Rejoindre</button>
-    </form>
 
     <section class="host-zone">
       <div class="zone-head">
@@ -80,6 +73,13 @@
       <div class="panel"><b>3. Que le show commence !</b>Les téléphones servent de buzzers, la télé fait le spectacle.</div>
     </section>
 
+    <!-- Invités : rejoindre un salon déjà ouvert (placé en bas pour ne pas être confondu avec « créer une partie ») -->
+    <form class="join-bar panel join-last" id="join-form">
+      <div class="join-txt"><b>📱 Vous êtes invité·e ? Rejoindre un salon déjà ouvert</b><span>Seulement si quelqu’un a déjà lancé une partie : tapez le code à 4 lettres affiché sur son écran</span></div>
+      <label class="sr" for="code">Code du salon</label>
+      <input class="code-input" id="code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" required>
+      <button class="btn big" type="submit">Rejoindre</button>
+    </form>
     <p class="footnote">Prototype · Pas besoin de compte pour jouer : un prénom et un avatar suffisent. Le compte est facultatif et sert à garder votre répertoire (historique, souvenirs, photos et captures). Points et argent du jeu sont virtuels. Bruitages synthétisés, sans musique sous droits.</p>
   </main>
 
