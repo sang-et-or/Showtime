@@ -1476,3 +1476,5 @@ body.mini .pause-card { padding: 14px; gap: 6px; } body.mini .pause-card h1 { fo
 body.organizer .pview { padding-bottom: 90px; }
 
 body.organizer .cam-btn { bottom: calc(84px + env(safe-area-inset-bottom)); } body.organizer .chat-btn { bottom: 156px; } body.organizer .screen-toggle { bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+.sound-btn.on { background: rgba(250, 204, 21, 0.2); box-shadow: inset 0 0 0 1px var(--gold); }

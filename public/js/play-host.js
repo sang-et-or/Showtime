@@ -1,4 +1,4 @@
-// Mode « téléphones seulement » : le téléphone de l'organisateur crée le salon, en est l'animateur
+﻿// Mode « téléphones seulement » : le téléphone de l'organisateur crée le salon, en est l'animateur
 // (inviter, choisir le jeu, lancer, Suivant, Pause, Finale…) ET y joue comme les autres.
 // Une seconde connexion « animateur » est ouverte à côté de la connexion « joueur ».
 /* global io, h, toast, SFX, confirm, navigator, location */
@@ -106,7 +106,7 @@ const Organizer = (() => {
     create() {
       open();
       return new Promise((ok, ko) => {
-        const go = () => hs.emit('host:create', { mode: 'remote', format: params.get('format'), game: params.get('game'), themes: params.get('themes') || undefined }, (res) => {
+        const go = () => hs.emit('host:create', { mode: 'remote', phones: true, format: params.get('format'), game: params.get('game'), themes: params.get('themes') || undefined }, (res) => {
           if (res.error) { ko(new Error(res.error)); return; }
           created = true;
           save({ code: res.code, token: res.hostToken, phones: true });

@@ -130,6 +130,7 @@ io.on('connection', (socket) => {
     const room = new Room(code, send);
     // La page d'accueil peut pré-choisir le mode, le format et le jeu.
     if (opts && typeof opts === 'object') room.updateSettings({ format: opts.format, game: opts.game, categories: typeof opts.themes === 'string' ? opts.themes.split(',') : undefined });
+    if (opts && opts.phones) room.phonesOnly = true; // partie « téléphones seulement » : pas d'écran principal
     rooms.set(code, room);
     room.hostSocket = socket.id;
     socket.data = { code, role: 'host' };

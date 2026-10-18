@@ -17,7 +17,44 @@ let joining = false;
 const read = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* navigation privée */ } };
 const buzz = (p) => { try { navigator.vibrate?.(p); } catch { /* */ } };
-document.addEventListener('pointerdown', () => SFX.unlock(), { once: true });
+document.addEventListener('pointerdown', () => {
+  SFX.unlock();
+  // iPhone : la synthèse vocale ne marche qu'après un premier geste ; on la « réveille » ici.
+  try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch { /* */ }
+}, { once: true });
+
+// ---------------------------------------------------------------------------
+// 🔊 Son du téléphone : voix de l'animateur + bruitages du spectacle.
+// Activé d'office quand il n'y a pas d'écran principal (mode « téléphones seulement »),
+// coupé d'office en présentiel (c'est la télé qui fait le son). Le choix de chacun est mémorisé.
+// ---------------------------------------------------------------------------
+const PhoneSound = (() => {
+  const KEY = 'showtime-phone-sound';
+  let pref = null; let on = false; let lastLine = -1;
+  try { pref = localStorage.getItem(KEY); } catch { /* */ }
+  /** Les bruitages du spectacle viennent de l'écran du jeu affiché en haut du téléphone (même site). */
+  function screenSfx() {
+    const fr = document.querySelector('#mini-wrap iframe');
+    try { fr?.contentWindow?.eval(`SFX.muted = ${!on}; if (${on}) SFX.unlock(); Voice.enabled = false;`); } catch { /* écran pas encore chargé */ }
+  }
+  return {
+    get on() { return on; },
+    sync(s) {
+      const want = pref ? pref === 'on' : !!s.phonesOnly;
+      if (want !== on) { on = want; screenSfx(); if (!on) Voice.enabled = false; else Voice.enabled = true; }
+      // L'animateur parle à chaque nouvelle phrase.
+      if (on && s.line && s.line.id !== lastLine) { if (lastLine !== -1) Voice.speak(s.line.text); lastLine = s.line.id; }
+      if (!on && s.line) lastLine = s.line.id;
+    },
+    toggle() {
+      on = !on; pref = on ? 'on' : 'off';
+      try { localStorage.setItem(KEY, pref); } catch { /* */ }
+      Voice.enabled = on; SFX.unlock(); screenSfx();
+      if (on) { Voice.speak('Le son est activé !'); toast('🔊 Son activé : voix de l’animateur et bruitages', 3000); } else toast('🔇 Son coupé sur ce téléphone', 2500);
+    },
+    screenLoaded: screenSfx,
+  };
+})();
 
 // ---------------------------------------------------------------------------
 // Connexion, reprise automatique après coupure (Wi-Fi, écran verrouillé…)
@@ -59,7 +96,7 @@ function miniScreen(s) {
   let show = $('#screen-show');
   if (want && !wrap) {
     wrap = h('div', { id: 'mini-wrap', class: 'mini-wrap' },
-      h('iframe', { src: `/host?room=${encodeURIComponent(s.code)}&spectate=1`, title: 'Écran du jeu en direct', allow: 'autoplay' }),
+      h('iframe', { src: `/host?room=${encodeURIComponent(s.code)}&spectate=1`, title: 'Écran du jeu en direct', allow: 'autoplay', onload: () => setTimeout(() => PhoneSound.screenLoaded(), 800) }),
       h('div', { class: 'mini-tools' },
         h('button', { onclick: () => { wrap.classList.toggle('big'); document.body.classList.toggle('split-big'); } }, '⤢ Agrandir'),
         h('button', { onclick: () => setPref('off') }, '✕ Masquer')));
@@ -212,8 +249,10 @@ function keyOf(s) {
 const act = (msg) => socket.emit('player:act', msg);
 function render(s) {
   state = s;
+  PhoneSound.sync(s);
   $('#me-bar').classList.remove('hidden');
   $('#me-bar').replaceChildren(avatarEl(s.me, 'sm'), h('div', { class: 'nm', text: s.me.name }), h('div', { class: 'score', text: `${fmt(s.me.score)} pts` }),
+    h('button', { class: `pause-btn sound-btn${PhoneSound.on ? ' on' : ''}`, 'aria-label': PhoneSound.on ? 'Couper le son' : 'Activer le son', onclick: () => { PhoneSound.toggle(); render(state); } }, PhoneSound.on ? '🔊' : '🔇'),
     s.canPause && !s.paused ? h('button', { class: 'pause-btn', 'aria-label': 'Mettre la partie en pause', onclick: () => { if (confirm('Mettre la partie en pause pour tout le monde ? (50 minutes maximum)')) { act({ type: 'pause' }); SFX.tap(); } } }, '⏸️') : '');
   PauseOverlay.set(s.paused, () => act({ type: 'resume' }));
   const rl = $('#remote-line');

@@ -586,6 +586,7 @@ class Room {
       photos: this.settings.photos && !this.isPrivate(), account: !!p.userId, private: this.isPrivate(),
       paused: this.pauseInfo(), canPause: this.phase !== 'lobby' && this.phase !== 'final',
       chat: this.chatOn(),
+      phonesOnly: !!this.phonesOnly, // pas d'écran principal : le son doit sortir des téléphones
     };
     switch (this.phase) {
       case 'lobby': {
