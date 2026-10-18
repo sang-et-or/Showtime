@@ -161,7 +161,7 @@ function expired() {
     h('div', { class: 'icon', text: '🕰️' }),
     h('h1', { text: 'Salon expiré' }),
     h('p', { text: 'Ce salon n’existe plus (le serveur a peut-être redémarré). Créez-en un nouveau, ça prend 2 secondes !' }),
-    h('a', { class: 'btn gold big', href: '/host?new=local', text: 'Créer un nouveau salon' })));
+    h('a', { class: 'btn gold big', href: '/host?new=1', text: 'Créer un nouveau salon' })));
 }
 
 // ---------------------------------------------------------------------------
@@ -415,12 +415,9 @@ const VIEWS = {
             : h('div', { class: 'row' }, h('span', { text: 'Photos' }),
               chip('📸 Autorisées', se.photos, () => send({ photos: true })),
               chip('🚫 Désactivées', !se.photos, () => send({ photos: false }))),
-          h('div', { class: 'row' }, h('span', { text: 'Joueurs' }),
-            chip('🛋️ Même pièce', se.mode === 'local', () => send({ mode: 'local' })),
-            chip('🌍 À distance', se.mode === 'remote', () => send({ mode: 'remote' }))),
-          se.mode === 'remote' ? h('div', { class: 'row' }, h('span', { text: 'Chat' }),
+          h('div', { class: 'row' }, h('span', { text: 'Chat' }),
             chip('💬 Activé', se.chat, () => send({ chat: true })),
-            chip('🔇 Désactivé', !se.chat, () => send({ chat: false }))) : '',
+            chip('🔇 Désactivé', !se.chat, () => send({ chat: false }))),
         );
 
         const needed = se.format === 'quick' ? game.min : 1;
@@ -454,8 +451,8 @@ const VIEWS = {
           const local = joinInfo && /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(joinInfo.base || '');
           remoteTip.replaceChildren(
             h('div', { text: local
-              ? '⚠️ À distance : ce lien ne marche que sur votre Wi-Fi. Hébergez le jeu en ligne pour inviter des amis éloignés (voir le guide).'
-              : '🌍 Partagez cet écran dans votre visio et envoyez le lien à vos invités.' }),
+              ? 'ℹ️ Ce lien marche sur votre Wi-Fi. Pour inviter des amis éloignés, hébergez le jeu en ligne (voir le guide).'
+              : '🌍 Des invités à distance ? Envoyez-leur ce lien : l’écran du jeu s’affiche aussi sur leur téléphone.' }),
             joinInfo ? h('button', { class: 'chip', style: 'margin-top:0.5em', onclick: () => navigator.clipboard?.writeText(joinInfo.url).then(() => toast('Lien copié !')) }, '📋 Copier le lien') : '');
         } else remoteTip.classList.add('hidden');
       },

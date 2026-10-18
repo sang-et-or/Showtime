@@ -33,7 +33,7 @@ class Room {
     this.spectators = new Set(); // téléphones qui affichent l'écran télé
     this.players = new Map();
     this.settings = {
-      mode: 'local', // 'local' (même pièce) | 'remote' (à distance)
+      mode: 'remote', // un seul mode : chaque joueur a son téléphone (même pièce ou à distance)
       format: 'show', // 'show' (Grand Show) | 'quick' (partie rapide)
       rounds: Object.fromEntries(SHOW_ROUNDS.map((id) => [id, true])),
       game: QUICK_GAMES[0],
@@ -344,7 +344,6 @@ class Room {
   updateSettings(s) {
     if (this.phase !== 'lobby' || !s || typeof s !== 'object') return;
     const se = this.settings;
-    if ((s.mode === 'local' || s.mode === 'remote') && s.mode !== se.mode) { se.mode = s.mode; se.vote = s.mode === 'remote'; }
     if (s.format === 'show' || s.format === 'quick') se.format = s.format;
     if (ALL_GAMES.includes(s.game) || ADULT_GAMES.includes(s.game)) se.game = s.game;
     if (['douceur', 'complicite', 'audace'].includes(s.coupleLevel)) se.coupleLevel = s.coupleLevel;

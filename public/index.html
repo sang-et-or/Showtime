@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=21">
+  <link rel="stylesheet" href="/css/style.css?v=22">
 </head>
 <body>
   <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -27,13 +27,10 @@
     <section class="host-zone">
       <div class="zone-head">
         <h2>📺 Lancer une soirée sur cet écran</h2>
-        <div class="mode-switch" role="group" aria-label="Où sont les joueurs ?">
-          <button type="button" data-mode="local" aria-pressed="true">🛋️ Tous dans la même pièce</button>
-          <button type="button" data-mode="remote" aria-pressed="false">🌍 À distance (visio)</button>
-        </div>
+        <p class="zone-note">📱 Chaque joueur joue avec son téléphone — dans la même pièce ou à distance, c’est pareil !</p>
       </div>
 
-      <a class="show-card" id="show-card" href="/host?new=local&format=show">
+      <a class="show-card" id="show-card" href="/host?new=1&format=show">
         <span class="show-ic">🎬</span>
         <span class="show-txt">
           <b>Le Grand Show</b>
@@ -84,16 +81,8 @@
   </main>
 
   <script>
-    let mode = 'local';
-    const link = (params) => `/host?new=${mode}&${params}`;
-    const showCard = document.getElementById('show-card');
-    document.querySelectorAll('.mode-switch button').forEach((b) => b.addEventListener('click', () => {
-      document.querySelectorAll('.mode-switch button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      mode = b.dataset.mode;
-      showCard.href = link('format=show');
-      document.querySelectorAll('.tile').forEach((t) => { t.href = link(`format=quick&game=${t.dataset.game}`); });
-      paintThemes();
-    }));
+    // Un seul mode : chaque joueur a son téléphone (même pièce ou à distance).
+    const link = (params) => `/host?new=1&${params}`;
 
     // Thèmes cochés dans le menu (gardés pour la prochaine visite).
     const chosen = new Set((() => { try { return JSON.parse(localStorage.getItem('showtime-themes')) || []; } catch { return []; } })());

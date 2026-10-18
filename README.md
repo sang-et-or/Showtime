@@ -31,12 +31,12 @@ un compte à rebours de 10 s lance la partie (l'hôte peut l'arrêter, ou relanc
 - **Époques** : Années 80, 90, 2000 · **Culture** : Culture générale, Géographie, Histoire, Cuisine, Hauts-de-France, Animaux, Sciences & espace, Expressions françaises
 - **Divertissement** : Musique, Cinéma, Télé & séries, Jeux vidéo · **Société** : Politique & institutions (faits neutres)
 - **Pour adultes** : Coquin 🔞 (désactivé par défaut, confirmation « joueurs majeurs », jamais vulgaire, rien sur des personnes réelles)
-- À distance, les joueurs qui votent pour le quiz cochent aussi leurs thèmes préférés : les plus demandés sont retenus.
+- Quand le vote des joueurs est activé, ceux qui votent pour le quiz cochent aussi leurs thèmes préférés : les plus demandés sont retenus.
 
 
 Et partout : QR code et code à 4 lettres, prénoms et avatars, classements animés, **Grande Finale**
 avec compte à rebours, podium et confettis, animateur virtuel « Max Paillettes » (textes + voix),
-bruitages synthétisés, durée Courte / Normale / Longue, mode même pièce ou à distance,
+bruitages synthétisés, durée Courte / Normale / Longue, un seul mode de jeu (chacun son téléphone, dans la même pièce ou à distance),
 reconnexion automatique des joueurs.
 
 ---
@@ -118,8 +118,8 @@ Si personne ne reprend dans les **50 minutes**, la partie s'arrête et le classe
 
 ## 2. Jouer à distance (mettre le jeu en ligne)
 
-Le mode « À distance » fonctionne ainsi : l'organisateur **partage l'écran du plateau** dans une visio
-(Zoom, Meet, Teams, WhatsApp…) et envoie le lien aux invités, qui jouent sur leur téléphone.
+Il n'y a plus qu'un seul mode : **chaque joueur joue avec son téléphone**, qu'il soit dans la même pièce ou à distance.
+Pour des invités éloignés, l'organisateur leur envoie le lien : l'écran du plateau s'affiche aussi sur leur téléphone (voir §8).
 Sur les téléphones, la question et les phrases de l'animateur s'affichent aussi, au cas où la visio est petite.
 
 Pour que des amis éloignés puissent se connecter, le jeu doit être **hébergé sur Internet**.
@@ -286,18 +286,19 @@ L'offre gratuite de Neon (0,5 Go) permet de garder plusieurs milliers de photos 
 
 ## 8. Jouer à distance : écran sur le téléphone et vote des jeux
 
-- **📺 Écran partagé** : en mode « À distance », chaque joueur voit le **plateau télé en direct sur la moitié haute de son
+- **📺 Écran partagé** : chaque joueur voit le **plateau télé en direct sur la moitié haute de son
   téléphone** (questions, plateaux, cartes, classements, podium…) et sa manette en dessous. Plus besoin de partager l'écran en visio.
-  Boutons « ⤢ Agrandir » et « ✕ Masquer » ; en mode « Même pièce », chacun peut l'afficher avec « 📺 Voir l'écran ».
+  Boutons « ⤢ Agrandir » et « ✕ Masquer » (utile dans la même pièce, où l'on voit déjà la télé) ; « 📺 Voir l'écran » le réaffiche.
   Le son et la voix de l'animateur s'activent en touchant 🔊 sur le mini-écran.
 - **🗳️ Vote des jeux** : dans le salon, chaque joueur vote sur son téléphone pour le jeu qu'il veut (Grand Show, quiz,
   plateaux, cartes). La télé affiche le décompte en direct ; au lancement (bouton de l'hôte ou « tous prêts »), le jeu le plus
-  voté est lancé, avec tirage au sort en cas d'égalité. Activé d'office à distance ; l'hôte peut choisir « 🎛️ Je choisis ».
+  voté est lancé, avec tirage au sort en cas d'égalité. L'hôte choisit dans le salon : « 🗳️ Vote des joueurs » ou « 🎛️ Je choisis ».
 
-### 💬 Le chat entre joueurs à distance
-En mode « 🌍 À distance », chaque téléphone a un bouton **💬** (avec une pastille pour les messages non lus). On peut écrire des messages (200 caractères maximum, un par seconde au plus) ou envoyer une réaction rapide 😂 👏 🔥 😱 ❤️ 🤔.
+### 💬 Le chat entre joueurs
+Chaque téléphone a un bouton **💬** (avec une pastille pour les messages non lus). On peut écrire des messages (200 caractères maximum, un par seconde au plus) ou envoyer une réaction rapide 😂 👏 🔥 😱 ❤️ 🤔.
 Les messages s’affichent aussi quelques secondes en bulles sur l’écran principal — **sauf pendant les jeux privés pour adultes**, où ils restent sur les téléphones.
-L’animateur peut couper le chat dans le salon (réglage « Chat »). Dans la même pièce, le chat n’apparaît pas.
+L’animateur peut couper le chat dans le salon (réglage « Chat »).
+
 ## 9. Jeu privé pour adultes : « Entre nous » 🔥
 
 Un jeu à **deux exactement**, pour les couples, rangé dans la famille « 🔞 Pour adultes » (accueil et « Changer de jeu »).
@@ -325,7 +326,7 @@ Six jeux inspirés des grands formats de la télé, avec nos propres noms, plate
 | 🏝️ **L’Île des Défis** | Deux tribus s’affrontent sur des épreuves au téléphone : la course aux noix de coco (tapez le plus vite possible), les poteaux (gardez le doigt appuyé, le dernier en place gagne) et le défi des sages (quiz). La tribu perdante vote **en secret** au conseil pour éliminer l’un des siens (qui rejoint le jury). Les survivants s’affrontent enfin sur les poteaux : le dernier debout gagne ! (4 joueurs minimum) |
 | 💕 **Les Tourtereaux** | Les joueurs forment des duos (un trio si le nombre est impair). À chaque manche, une question porte sur l’un des deux (« Quel est le plat préféré de Lou ? ») : il répond pour lui en secret, son partenaire devine. Réponses identiques : +200 chacun ! Si c’est presque pareil, les autres joueurs votent « ça compte ? » ; à deux, c’est la personne concernée qui valide. |
 
-On les trouve dans la famille « 📺 Jeux télé » de l’accueil et du menu des jeux, et les joueurs à distance peuvent voter pour eux.
+On les trouve dans la famille « 📺 Jeux télé » de l’accueil et du menu des jeux, et les joueurs peuvent voter pour eux.
 
 ### Brûlant 🌶️ (Action ou Vérité coquin pour couple)
 Dans la famille « 🔞 Pour adultes ». À deux exactement, chacun sur son téléphone : on choisit **Action** ou **Vérité**, et la température monte au fil des tours (🌶️ sensuel → 🌶️🌶️ coquin → 🌶️🌶️🌶️ osé), sans dépasser le niveau choisi dans le salon (« Jusqu’à… »).

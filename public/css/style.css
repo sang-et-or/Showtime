@@ -1299,3 +1299,5 @@ body.mini .pause-card { padding: 14px; gap: 6px; } body.mini .pause-card h1 { fo
 .host.mini .chat-stack { bottom: 4em; font-size: 0.9em; max-width: 70vw; }
 
 .join-bar.join-last { margin-top: 28px; }
+
+.zone-note { margin: 0.2em 0 0; color: var(--muted); font-weight: 700; }

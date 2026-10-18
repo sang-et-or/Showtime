@@ -28,7 +28,7 @@ async function main() {
     await new Promise((r) => a.emit('player:join', { code: room.code, name: 'Lou', avatar: '🦊' }, r));
     await new Promise((r) => b.emit('player:join', { code: room.code, name: 'Sam', avatar: '🐼' }, r));
     await sleep(300);
-    assert(as.chat === true, 'à distance : le chat est proposé aux joueurs');
+    assert(as.chat === true, 'le chat est proposé aux joueurs');
 
     a.emit('chat:send', { text: '  Bonsoir   tout le monde ! ' });
     await sleep(300);
@@ -66,10 +66,6 @@ async function main() {
     await sleep(300);
     assert(as.chat === false && !got.b.some((m) => m.text === 'Encore là ?'), 'chat désactivé par l’animateur : plus aucun message');
 
-    // Même pièce : pas de chat.
-    host.emit('host:action', { type: 'settings', settings: { ...hs.settings, chat: true, mode: 'local' } });
-    await sleep(300);
-    assert(as.chat === false, 'dans la même pièce : pas de chat');
     host.close(); a.close(); b.close();
   } finally { server.kill(); }
   if (failed) { console.log(`\n${failed} test(s) en échec`); process.exit(1); }

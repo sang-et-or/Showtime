@@ -98,6 +98,7 @@ const QUESTIONS = [
 QUESTIONS.push(...require('./quiz-themes'), ...require('./quiz-themes2'), ...require('./quiz-clubs').QUESTIONS);
 // Questions supplémentaires (une trentaine de plus par thème, pour éviter les répétitions).
 QUESTIONS.push(...require('./quiz-more1'), ...require('./quiz-more2'), ...require('./quiz-more3'), ...require('./quiz-more4'));
+QUESTIONS.push(...require('./quiz-more5'), ...require('./quiz-more6'), ...require('./quiz-more7'), ...require('./quiz-more8'));
 const { CLUBS } = require('./quiz-clubs');
 
 module.exports = { CATEGORIES, DEFAULT_CATEGORIES, QUESTIONS, CLUBS };

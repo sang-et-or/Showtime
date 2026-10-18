@@ -129,8 +129,7 @@ io.on('connection', (socket) => {
     const code = newCode();
     const room = new Room(code, send);
     // La page d'accueil peut pré-choisir le mode, le format et le jeu.
-    if (opts && opts.mode === 'remote') room.settings.vote = true;
-    if (opts && typeof opts === 'object') room.updateSettings({ mode: opts.mode, format: opts.format, game: opts.game, categories: typeof opts.themes === 'string' ? opts.themes.split(',') : undefined });
+    if (opts && typeof opts === 'object') room.updateSettings({ format: opts.format, game: opts.game, categories: typeof opts.themes === 'string' ? opts.themes.split(',') : undefined });
     rooms.set(code, room);
     room.hostSocket = socket.id;
     socket.data = { code, role: 'host' };
