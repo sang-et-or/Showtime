@@ -252,11 +252,149 @@ Object.assign(VIEWS, {
 });
 
 // =====================================================================
+// Le Chemin de la Vie : vrai plateau en perspective, route sinueuse et pions qui avancent case par case
+// =====================================================================
+const V3 = { W: 100, H: 90, rows: [78, 57, 36, 15], x0: 10, x1: 90, tilt: 48, wheelDelay: 1700, stepMs: 330 };
+
+/** Points régulièrement espacés le long d'une route en serpentin (départ devant, retraite au fond). */
+function viePath(n) {
+  const fine = [];
+  const r = (V3.rows[0] - V3.rows[1]) / 2;
+  V3.rows.forEach((y, k) => {
+    const ltr = k % 2 === 0;
+    for (let t = 0; t <= 40; t++) fine.push([ltr ? V3.x0 + (V3.x1 - V3.x0) * t / 40 : V3.x1 - (V3.x1 - V3.x0) * t / 40, y]);
+    if (k < V3.rows.length - 1) { // virage en demi-cercle vers la rangée suivante
+      const cx = ltr ? V3.x1 : V3.x0;
+      for (let t = 1; t < 24; t++) {
+        const a = Math.PI / 2 + (Math.PI * t) / 24;
+        fine.push([cx + (ltr ? -1 : 1) * r * Math.cos(a), y - r - r * Math.sin(a)]);
+      }
+    }
+  });
+  const acc = [0];
+  for (let i = 1; i < fine.length; i++) acc.push(acc[i - 1] + Math.hypot(fine[i][0] - fine[i - 1][0], fine[i][1] - fine[i - 1][1]));
+  const total = acc[acc.length - 1];
+  const out = [];
+  for (let k = 0, j = 1; k < n; k++) {
+    const d = (total * k) / (n - 1);
+    while (j < fine.length - 1 && acc[j] < d) j++;
+    const f = (d - acc[j - 1]) / (acc[j] - acc[j - 1] || 1);
+    out.push([fine[j - 1][0] + (fine[j][0] - fine[j - 1][0]) * f, fine[j - 1][1] + (fine[j][1] - fine[j - 1][1]) * f]);
+  }
+  return { pts: out, fine };
+}
+
+/** Roue de la vie numérotée de 1 à 10, qui tourne et s'arrête sous le repère. */
+function lifeWheel() {
+  const COLORS = ['#ff3d8b', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c', '#60a5fa', '#f472b6', '#34d399', '#fde047'];
+  const disc = h('div', { class: 'lw-disc', style: `background:conic-gradient(${COLORS.map((c, i) => `${c} ${i * 36}deg ${(i + 1) * 36}deg`).join(',')})` },
+    ...COLORS.map((_, i) => h('b', { style: `--a:${i * 36 + 18}deg`, text: String(i + 1) })));
+  const el = h('div', { class: 'life-wheel' }, h('i', { class: 'lw-pin' }), disc, h('div', { class: 'lw-hub', text: '🛤️' }));
+  let angle = 0; let last = null;
+  return {
+    el,
+    show(value, key) {
+      if (value == null) { el.classList.remove('rolled'); last = null; return; }
+      if (key === last) return;
+      last = key;
+      SFX.drumroll(1.2);
+      const target = 360 - ((value - 1) * 36 + 18); // le numéro tiré s'arrête en haut, sous le repère
+      angle += 360 * 4 + ((target - (angle % 360)) + 360) % 360;
+      disc.style.transform = `rotate(${angle}deg)`;
+      setTimeout(() => { el.classList.add('rolled'); SFX.pop(); }, V3.wheelDelay - 200);
+    },
+  };
+}
+
+function vieScene(T) {
+  const { pts, fine } = viePath(T.board.length);
+  const plane = h('div', { class: 'v3-plane', style: `--tilt:${V3.tilt}deg` });
+  const stage = h('div', { class: 'v3-stage' }, plane);
+  const pct = ([x, y]) => `left:${x}%;top:${(y / V3.H) * 100}%`;
+  // La route (SVG généré ici à partir de nos propres coordonnées).
+  const d = fine.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`).join(' ');
+  const road = h('div', { class: 'v3-road' });
+  road.innerHTML = `<svg viewBox="0 0 ${V3.W} ${V3.H}" preserveAspectRatio="none" aria-hidden="true">
+    <path d="${d}" fill="none" stroke="#f8fafc" stroke-width="10.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${d}" fill="none" stroke="#3f4352" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${d}" fill="none" stroke="#facc15" stroke-width="0.45" stroke-dasharray="1.6 1.6"/></svg>`;
+  plane.append(h('i', { class: 'v3-edge' }), road);
+  // Décor : arbres, maisons, montagnes… debout, à l'écart de la route.
+  const DECOR = ['🌳', '🌲', '🏡', '🌻', '🐄', '🌳', '⛪', '🏫', '🌲', '🏥', '🌷', '🏢', '🐑', '🌳'];
+  let seed = 7;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let k = 0; k < 70; k++) {
+    const x = 3 + rnd() * 94; const y = 3 + rnd() * 84;
+    if (fine.some(([fx, fy]) => Math.hypot(fx - x, fy - y) < 8)) continue;
+    plane.append(h('div', { class: 'v3-bb v3-decor', style: `${pct([x, y])};--s:${(0.8 + rnd() * 0.6).toFixed(2)}`, text: DECOR[k % DECOR.length] }));
+  }
+  plane.append(h('div', { class: 'v3-bb v3-decor big', style: `${pct([96, 6])};--s:1.6`, text: '⛰️' }), h('div', { class: 'v3-bb v3-decor big', style: `${pct([5, 5])};--s:1.4`, text: '🏰' }));
+  // Les cases, et un panneau debout pour les étapes importantes de la vie.
+  const tiles = T.board.map((sq, i) => {
+    const t = h('div', { class: `v3-tile t-${sq.type}`, style: pct(pts[i]) }, h('span', { text: sq.icon }), h('small', { text: String(i) }));
+    plane.append(t);
+    if (sq.type !== 'event' && sq.type !== 'paie') plane.append(h('div', { class: `v3-bb v3-sign t-${sq.type}`, style: pct([pts[i][0], pts[i][1] - 4.6]) }, h('b', { text: `${sq.icon} ${sq.label}` })));
+    return t;
+  });
+  // Taille : le plateau prend toute la place disponible (unité --u = 1 % de sa largeur).
+  new ResizeObserver(() => {
+    const w = Math.max(10, Math.min(stage.clientWidth * 0.84, stage.clientHeight > 60 ? stage.clientHeight * 1.3 : Infinity));
+    plane.style.setProperty('--pw', `${w}px`);
+    plane.style.setProperty('--u', `${w / 100}px`);
+  }).observe(stage);
+
+  const pawns = new Map(); // id → { el, shown, timers }
+  function placePawn(p, pos, slot) {
+    const [x, y] = pts[pos];
+    const a = (slot * 2.4);
+    p.el.style.left = `${x + (slot ? Math.cos(a) * 2.2 : 0)}%`;
+    p.el.style.top = `${((y + (slot ? Math.sin(a) * 1.6 : 0)) / V3.H) * 100}%`;
+  }
+  return {
+    el: stage,
+    update(st, cur) {
+      const TT = st.track;
+      const slots = new Map();
+      TT.seats.forEach((seat) => {
+        if (!seat.player) return;
+        let p = pawns.get(seat.player.id);
+        if (!p) {
+          p = { el: h('div', { class: 'v3-bb v3-pawn', style: `--c:${seat.player.color}` }, h('div', { class: 'peg' }, h('span', { text: seat.player.avatar }), h('i'))), shown: seat.pos, timers: [] };
+          pawns.set(seat.player.id, p); plane.append(p.el);
+        }
+        p.el.classList.toggle('mine-turn', seat.player.id === cur?.player.id);
+        const slot = slots.get(seat.pos) || 0; slots.set(seat.pos, slot + 1);
+        if (seat.pos > p.shown && st.stage === 'move') {
+          // Le pion avance case par case, après l'arrêt de la roue.
+          p.timers.forEach(clearTimeout); p.timers = [];
+          const from = p.shown; const to = seat.pos;
+          p.shown = to;
+          for (let k = from + 1; k <= to; k++) {
+            p.timers.push(setTimeout(() => {
+              placePawn(p, k, 0);
+              p.el.classList.remove('hop'); void p.el.offsetWidth; p.el.classList.add('hop');
+              tiles[k].classList.add('lit'); setTimeout(() => tiles[k].classList.remove('lit'), 500);
+              SFX.blip();
+            }, V3.wheelDelay + (k - from - 1) * V3.stepMs));
+          }
+          p.timers.push(setTimeout(() => { placePawn(p, to, slot); p.timers = []; }, V3.wheelDelay + (to - from) * V3.stepMs + 150));
+        } else if (seat.pos !== p.shown || !p.timers.length) {
+          p.timers.forEach(clearTimeout); p.timers = [];
+          p.shown = seat.pos;
+          placePawn(p, seat.pos, slot);
+        }
+      });
+    },
+  };
+}
+
+// =====================================================================
 // Jeux de parcours : Chemin de la Vie, Fin de Mois
 // =====================================================================
 function trackBoardView(root, s) {
   SFX.whoosh();
   const T = s.track;
+  if (T.id === 'vie') return vieBoardView(root, s);
   const grid = h('div', { class: `track-grid ${T.id}`, style: `--cols:${T.cols}` });
   const cells = [];
   const order = T.id === 'mois' ? T.board.slice(1) : T.board; // le calendrier commence au jour 1
@@ -312,6 +450,51 @@ function trackBoardView(root, s) {
       clock.textContent = `⏱ ${mmss(TT.endsInMs)} restantes`;
 
       // carte événement
+      if (st.card) {
+        const k = JSON.stringify(st.card) + st.chosen;
+        if (k !== lastCard) {
+          lastCard = k;
+          if (st.card.tone === 'good') SFX.correct(); else if (st.card.tone === 'bad') SFX.wrong(); else SFX.reveal();
+        }
+        overlay.classList.remove('hidden');
+        overlay.replaceChildren(h('div', { class: `event-card tone-${st.card.tone} pop` },
+          h('div', { class: 'ev-icon', text: st.card.icon }), h('h2', { text: st.card.title }), h('p', { text: st.card.text }),
+          st.card.delta ? h('div', { class: `ev-delta ${st.card.delta > 0 ? 'plus' : 'minus'}`, text: `${st.card.delta > 0 ? '+' : '−'}${fmt(Math.abs(st.card.delta))} ${TT.currency}` }) : '',
+          st.choice ? h('div', { class: 'ev-choice' }, h('span', { class: 'chip', text: st.choice.yes }), h('b', { text: 'ou' }), h('span', { class: 'chip', text: st.choice.no }),
+            h('small', { text: `📱 ${cur?.player.name || ''} choisit sur son téléphone` })) : ''));
+      } else {
+        overlay.classList.add('hidden');
+        lastCard = null;
+      }
+    },
+  };
+}
+
+/** Écran télé du Chemin de la Vie : plateau en perspective + roue de la vie + joueurs. */
+function vieBoardView(root, s) {
+  const scene = vieScene(s.track);
+  const wheel = lifeWheel();
+  const turnBox = h('div', { class: 'turn-box' });
+  const side = h('div', { class: 'side-list' });
+  const clock = h('div', { class: 'game-clock' });
+  const overlay = h('div', { class: 'card-overlay hidden' });
+  const passed = h('div', { class: 'passed-list' });
+  root.append(h('div', { class: 'board-layout' },
+    h('div', { class: 'board-wrap track-wrap v3-wrap' }, scene.el, overlay),
+    h('div', { class: 'board-side' }, turnBox, wheel.el, passed, side, clock)));
+  let lastCard = null;
+  return {
+    update(st) {
+      const TT = st.track;
+      const cur = TT.seats[TT.turn];
+      scene.update(st, cur);
+      wheel.show(st.stage === 'roll' || st.stage == null ? null : st.roll, `${TT.seq}:${st.roll}`);
+      passed.replaceChildren(...(st.passed || []).map((t) => h('div', { class: 'gain ok rise', text: t })));
+      turnBox.replaceChildren(cur ? avatarEl(cur.player, '') : '',
+        h('div', {}, h('small', { text: 'À toi de jouer' }), h('b', { text: cur?.player.name || '' }),
+          h('small', { text: st.stage === 'roll' ? '📱 Fais tourner la roue !' : st.choice && !st.chosen ? '📱 À toi de choisir…' : '' })));
+      side.replaceChildren(...TT.seats.map((seat, i) => sideRow(seat.player, i === TT.turn, [`${fmt(seat.money)} ${TT.currency}`, seat.summary ? ` · ${seat.summary}` : ''])));
+      clock.textContent = `⏱ ${mmss(TT.endsInMs)} restantes`;
       if (st.card) {
         const k = JSON.stringify(st.card) + st.chosen;
         if (k !== lastCard) {

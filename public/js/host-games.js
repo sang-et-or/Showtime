@@ -404,3 +404,28 @@ Object.assign(VIEWS, {
       h('p', { class: 'spot-sub', text: 'La liste est sur vos téléphones… La suite vous appartient 😉' })));
   },
 });
+
+// =====================================================================
+// « Brûlant » (Action ou Vérité coquin) : l'écran principal reste neutre, jamais le contenu des cartes.
+// =====================================================================
+function brulantScreen(root, s) {
+  SFX.whoosh();
+  const B = s.br;
+  const status = s.phase === 'brChoose' ? `${B.who?.name || ''} choisit : action ou vérité ?`
+    : B.result === 'done' ? (B.kind === 'dare' ? '🔥 Action relevée !' : '💬 Vérité dite !') : B.result === 'veto' ? '🙅 Pas ce soir… on passe !' : B.result === 'joker' ? '🙈 Joker !'
+      : B.kind === 'dare' ? `🔥 ${B.who?.name || ''} relève une action…` : `💬 ${B.who?.name || ''} dit une vérité…`;
+  root.append(h('div', { class: 'spot couple-spot' },
+    h('div', { class: 'duo' }, ...B.players.filter(Boolean).map((p) => avatarEl(p, 'lg'))),
+    h('div', { class: 'kind-badge defi', text: `${B.heat.icon} ${B.heat.label}` }),
+    h('h1', { class: 'spot-title', text: status }),
+    h('p', { class: 'spot-sub', text: `Tour ${B.turn} / ${B.total} · 📱 Tout se passe sur vos téléphones · 🔒 rien n’est enregistré` })));
+}
+Object.assign(VIEWS, {
+  brChoose: brulantScreen, brCard: brulantScreen,
+  brEnd(root, s) {
+    SFX.fanfare();
+    root.append(h('div', { class: 'spot couple-spot' }, h('div', { class: 'big-emoji', text: '🌶️' }),
+      h('h1', { class: 'spot-title', text: `${s.br.done.dare} action${s.br.done.dare > 1 ? 's' : ''} · ${s.br.done.truth} vérité${s.br.done.truth > 1 ? 's' : ''}` }),
+      h('p', { class: 'spot-sub', text: 'La partie est finie… la soirée, elle, ne fait que commencer 😉' })));
+  },
+});

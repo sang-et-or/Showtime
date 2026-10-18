@@ -1,4 +1,4 @@
-// Jeu de parcours « Le Chemin de la Vie » (inspiré des jeux de « parcours de vie »,
+﻿// Jeu de parcours « Le Chemin de la Vie » (inspiré des jeux de « parcours de vie »,
 // avec notre propre plateau, nos événements et nos règles).
 // On fait tourner la roue (1 à 10), on traverse la vie : études, paies, bébés, maison,
 // coups de chance et coups durs… La plus grosse fortune à la retraite gagne.
@@ -49,6 +49,7 @@ module.exports = createTrackGame({
   sides: 10,
   currency: '🪙',
   cols: 9,
+  moveMs: (steps) => 1_700 + steps * 330 + 900, // roue qui tourne, puis le pion avance case par case
   introLine: () => animator.vieIntro(),
   turnLine: (name) => pick([`${name}, fais tourner la roue de la vie !`, `À toi, ${name} ! Que te réserve le destin ?`]),
   endLine: (name) => `Toute la troupe est à la retraite ! La plus belle fortune revient à ${name} !`,

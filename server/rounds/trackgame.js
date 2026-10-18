@@ -14,7 +14,7 @@ const CAP_MIN = { short: 8, normal: 12, long: 18 };
 
 /**
  * cfg : { id, title, icon, subtitle, pitch, rules, players, duration, minPlayers, introLine,
- *         sides, currency, buildBoard(room), initSeat(room, seat), firstTurn?(room, seat, api),
+ *         sides, currency, moveMs?(cases), buildBoard(room), initSeat(room, seat), firstTurn?(room, seat, api),
  *         maxPos(seat), resolve(room, seat, square, api) → carte, onPass?(room, seat, from, to, api) → textes,
  *         finalTotal(seat), points(total), summary(seat), endLine(room, top) }
  * Une « carte » : { icon, title, text, delta?, choice?: { yes, no, onChoose(yes) → carte } }
@@ -74,7 +74,8 @@ function createTrackGame(cfg) {
     seat.pos = to;
     g.seq++;
     room.enter(T, { stage: 'move', roll: r, from, to, passed });
-    room.setTimer(MOVE_MS + passed.length * 900, () => land(room));
+    // Le temps de voir la roue tourner puis le pion avancer case par case (moveMs propre au jeu, sinon durée fixe).
+    room.setTimer((cfg.moveMs ? cfg.moveMs(to - from) : MOVE_MS) + passed.length * 900, () => land(room));
     room.sync();
   }
 

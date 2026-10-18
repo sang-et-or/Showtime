@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=15">
+  <link rel="stylesheet" href="/css/style.css?v=20">
 </head>
 <body>
   <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -60,6 +60,9 @@
 
       <h3 class="family">⚡ Parties rapides <small>un seul jeu, 5 à 15 minutes</small></h3>
       <div class="tile-grid" id="quick-grid"></div>
+
+      <h3 class="family">📺 Jeux télé <small>comme à la télé, avec nos propres règles</small></h3>
+      <div class="tile-grid" id="tv-grid"></div>
 
       <h3 class="family">🎲 Jeux de plateau <small>dés, pions et coups bas</small></h3>
       <div class="tile-grid" id="board-grid"></div>
@@ -122,6 +125,7 @@
     }
     fetch('/api/catalog').then((r) => r.json()).then((c) => {
       document.getElementById('quick-grid').append(...c.quick.map(tile));
+      document.getElementById('tv-grid').append(...c.tv.map(tile));
       document.getElementById('board-grid').append(...c.board.map(tile));
       document.getElementById('cards-grid').append(...c.cards.map(tile));
       document.getElementById('adult-grid').append(...c.adult.map((g) => { const t = tile(g); t.classList.add('adult-tile'); t.addEventListener('click', (e) => { if (!confirm('🔞 Jeu privé réservé aux adultes consentants (2 joueurs).\nRien n’est enregistré. Continuer ?')) e.preventDefault(); }); return t; }));

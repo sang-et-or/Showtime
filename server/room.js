@@ -9,7 +9,7 @@
 
 const animator = require('./animator');
 const { CATEGORIES, DEFAULT_CATEGORIES, CLUBS } = require('./content/questions');
-const { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, CARD_GAMES, ADULT_GAMES, ownerOf } = require('./rounds');
+const { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, CARD_GAMES, TV_GAMES, ADULT_GAMES, ownerOf } = require('./rounds');
 const { token, shortId } = require('./util');
 const { installMemories } = require('./memories');
 
@@ -19,7 +19,7 @@ const LENGTHS = ['short', 'normal', 'long'];
 const DURATIONS = { roundIntro: 7_000, leaderboard: 7_000, podium: 7_000 };
 const AUTOSTART_MS = 10_000;
 const PAUSE_MAX_MS = Number(process.env.SHOWTIME_PAUSE_MAX_MS) || 50 * 60_000; // au-delà, la partie s'arrête
-const ALL_GAMES = [...QUICK_GAMES, ...BOARD_GAMES, ...CARD_GAMES]; // compte à rebours quand tout le monde est prêt
+const ALL_GAMES = [...QUICK_GAMES, ...TV_GAMES, ...BOARD_GAMES, ...CARD_GAMES]; // compte à rebours quand tout le monde est prêt
 const COLORS = ['#ff3d8b', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c', '#f87171', '#34d399', '#60a5fa', '#f472b6', '#fde047', '#2dd4bf'];
 
 class Room {
@@ -342,7 +342,7 @@ class Room {
     const se = this.settings;
     if ((s.mode === 'local' || s.mode === 'remote') && s.mode !== se.mode) { se.mode = s.mode; se.vote = s.mode === 'remote'; }
     if (s.format === 'show' || s.format === 'quick') se.format = s.format;
-    if (QUICK_GAMES.includes(s.game) || BOARD_GAMES.includes(s.game) || CARD_GAMES.includes(s.game) || ADULT_GAMES.includes(s.game)) se.game = s.game;
+    if (ALL_GAMES.includes(s.game) || ADULT_GAMES.includes(s.game)) se.game = s.game;
     if (['douceur', 'complicite', 'audace'].includes(s.coupleLevel)) se.coupleLevel = s.coupleLevel;
     if (LENGTHS.includes(s.length)) se.length = s.length;
     if (s.rounds && typeof s.rounds === 'object') {
@@ -605,7 +605,7 @@ class Room {
 /** Jeux proposés au vote des joueurs. */
 function voteOptions() {
   const info = (id) => ({ id, title: ROUNDS[id].title, icon: ROUNDS[id].icon, min: ROUNDS[id].minPlayers || 1 });
-  return [{ id: 'show', title: 'Le Grand Show', icon: '🎬', min: 1 }, ...QUICK_GAMES.map(info), ...BOARD_GAMES.map(info), ...CARD_GAMES.map(info)];
+  return [{ id: 'show', title: 'Le Grand Show', icon: '🎬', min: 1 }, ...QUICK_GAMES.map(info), ...TV_GAMES.map(info), ...BOARD_GAMES.map(info), ...CARD_GAMES.map(info)];
 }
 
 /** Ce que l'écran hôte propose dans le salon : manches du Grand Show et parties rapides. */
@@ -614,7 +614,7 @@ function catalog() {
     const m = ROUNDS[id];
     return { id, title: m.title, icon: m.icon, pitch: m.pitch, rules: m.rules || m.subtitle, players: m.players || '', duration: m.duration || '', min: m.minPlayers || 1 };
   };
-  return { show: SHOW_ROUNDS.map(info), quick: QUICK_GAMES.map(info), board: BOARD_GAMES.map(info), cards: CARD_GAMES.map(info), adult: ADULT_GAMES.map(info), coupleLevels: ROUNDS.couple.LEVELS, themes: CATEGORIES, clubs: CLUBS };
+  return { show: SHOW_ROUNDS.map(info), quick: QUICK_GAMES.map(info), tv: TV_GAMES.map(info), board: BOARD_GAMES.map(info), cards: CARD_GAMES.map(info), adult: ADULT_GAMES.map(info), coupleLevels: ROUNDS.couple.LEVELS, themes: CATEGORIES, clubs: CLUBS };
 }
 
 installMemories(Room);

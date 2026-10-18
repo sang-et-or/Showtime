@@ -32,6 +32,13 @@ const modules = [
   require('./cards/president'),
   require('./cards/huit'),
   require('./couple'),
+  require('./motus'),
+  require('./motpourmot'),
+  require('./sondage'),
+  require('./rouelettres'),
+  require('./ile'),
+  require('./tourtereaux'),
+  require('./brulant'),
 ];
 
 const ROUNDS = Object.fromEntries(modules.map((m) => [m.id, m]));
@@ -39,7 +46,8 @@ const SHOW_ROUNDS = ['quiz', 'whosaid', 'defi', 'duel'];
 const QUICK_GAMES = ['quiz', 'petitbac', 'undercover', 'pendu', 'estimation'];
 const BOARD_GAMES = ['ludo', 'roue', 'vie', 'mois'];
 const CARD_GAMES = ['belote', 'poker', 'president', 'huit', 'blackjack', 'bataille'];
-const ADULT_GAMES = ['couple']; // jamais proposés au vote, rien n'est enregistré
+const TV_GAMES = ['motus', 'motpourmot', 'sondage', 'rouelettres', 'ile', 'tourtereaux']; // inspirés des jeux télé, avec nos propres noms
+const ADULT_GAMES = ['couple', 'brulant']; // jamais proposés au vote, rien n'est enregistré
 
 const PHASE_OWNER = new Map();
 for (const m of modules) {
@@ -50,4 +58,4 @@ for (const m of modules) {
 }
 const ownerOf = (phase) => PHASE_OWNER.get(phase) || null;
 
-module.exports = { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, CARD_GAMES, ADULT_GAMES, ownerOf };
+module.exports = { ROUNDS, SHOW_ROUNDS, QUICK_GAMES, BOARD_GAMES, CARD_GAMES, TV_GAMES, ADULT_GAMES, ownerOf };

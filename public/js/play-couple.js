@@ -79,3 +79,53 @@ Object.assign(PVIEWS, {
       h('small', { class: 'muted', text: '🔒 Rien n’a été enregistré. Ce qui se passe ici reste entre vous.' }));
   },
 });
+
+// =====================================================================
+// « Brûlant » : Action ou Vérité coquin (cartes visibles uniquement sur les deux téléphones)
+// =====================================================================
+Object.assign(PVIEWS, {
+  brChoose(root, s) {
+    root.classList.add('couple');
+    center(root);
+    const B = s.br;
+    const head = h('div', { class: 'cp-head' }, h('span', { class: 'chip', text: `${B.heat.icon} ${B.heat.label}` }), h('small', { text: `${B.turn}/${B.total}` }));
+    if (!B.isMe) { root.append(head, avatarEl(B.who, 'lg'), h('h1', { text: `${B.who?.name || ''} choisit…` }), h('p', { text: 'Action ou vérité ? Patience… 😏' }), timerBar()); return; }
+    buzz([80, 40, 80]);
+    root.append(head, h('h1', { text: 'Action ou vérité ?' }), timerBar(),
+      h('div', { class: 'br-choice' },
+        h('button', { class: 'br-btn truth', onclick: () => { act({ type: 'truth' }); softTap(); } }, h('span', { text: '💬' }), h('b', { text: 'Vérité' })),
+        h('button', { class: 'br-btn dare', onclick: () => { act({ type: 'dare' }); softTap(); } }, h('span', { text: '🔥' }), h('b', { text: 'Action' }))),
+      h('small', { class: 'muted', text: `Avec ${B.partner?.name || ''} · Joker toujours possible` }));
+  },
+
+  brCard(root, s) {
+    root.classList.add('couple');
+    center(root);
+    const B = s.br;
+    const dare = s.kind === 'dare';
+    const head = h('div', { class: 'cp-head' }, h('span', { class: 'chip', text: `${B.heat.icon} ${dare ? 'Action' : 'Vérité'}` }), h('small', { text: `${B.turn}/${B.total}` }));
+    if (s.result) {
+      root.append(head, h('div', { class: 'big-emoji pop', text: s.result === 'done' ? (dare ? '🔥' : '💬') : s.result === 'veto' ? '🙅' : '🙈' }),
+        h('h1', { text: s.result === 'done' ? 'Bravo !' : s.result === 'veto' ? 'Pas ce soir, on passe' : 'Joker !' }));
+      return;
+    }
+    const card = h('div', { class: 'cp-card' }, h('b', { text: s.text }));
+    if (B.isMe) {
+      buzz([80, 40, 80]);
+      root.append(head, card, h('p', { text: dare ? `À faire à ${B.partner?.name || ''}, seulement si vous êtes d’accord tous les deux.` : `Réponds à ${B.partner?.name || ''}, les yeux dans les yeux.` }), timerBar(),
+        h('div', { class: 'cp-actions' },
+          h('button', { class: 'btn gold big', onclick: () => { act({ type: 'done' }); softTap(); } }, dare ? 'C’est fait 🔥' : 'C’est dit 💬'),
+          h('button', { class: 'btn ghost', onclick: () => { act({ type: 'joker' }); softTap(); } }, 'Joker 🙈 (passer)')));
+    } else {
+      root.append(head, card, h('p', { text: dare ? `${B.who?.name || ''} va relever cette action… si tu es d’accord 💛` : `${B.who?.name || ''} va te répondre… Écoute bien 💛` }), timerBar(),
+        dare ? h('div', { class: 'cp-actions' }, h('button', { class: 'btn ghost', onclick: () => { act({ type: 'veto' }); softTap(); } }, 'Pas ce soir 🙅')) : '');
+    }
+  },
+
+  brEnd(root, s) {
+    root.classList.add('couple');
+    center(root).append(h('div', { class: 'big-emoji pop', text: '🌶️' }), h('h1', { text: 'Fin de la partie' }),
+      h('p', { text: `${s.done.dare} action${s.done.dare > 1 ? 's' : ''} relevée${s.done.dare > 1 ? 's' : ''} et ${s.done.truth} vérité${s.done.truth > 1 ? 's' : ''} dite${s.done.truth > 1 ? 's' : ''}.` }),
+      h('small', { class: 'muted', text: '🔒 Rien n’a été enregistré. Ce qui se passe ici reste entre vous.' }));
+  },
+});

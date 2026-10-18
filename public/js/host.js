@@ -368,7 +368,7 @@ const VIEWS = {
         const se = st.settings;
         const cat = st.catalog;
         const online = st.players.filter((p) => p.connected).length;
-        const allGames = [...cat.quick, ...cat.board, ...cat.cards, ...cat.adult];
+        const allGames = [...cat.quick, ...cat.tv, ...cat.board, ...cat.cards, ...cat.adult];
         const game = allGames.find((g) => g.id === se.game) || allGames[0];
         const usesQuiz = se.format === 'show' ? (se.rounds.quiz || se.rounds.duel) : se.game === 'quiz';
         const changeBtn = h('button', { class: 'btn ghost', onclick: () => openPicker(st) }, '🔄 Changer de jeu');
@@ -382,7 +382,7 @@ const VIEWS = {
             changeBtn)
           : h('div', { class: 'prog-hero' },
             h('span', { class: 'prog-ic', text: game.icon }),
-            h('div', { class: 'prog-txt' }, h('small', { text: cat.board.some((g) => g.id === game.id) ? 'Jeu de plateau' : cat.cards.some((g) => g.id === game.id) ? 'Jeu de cartes' : cat.adult.some((g) => g.id === game.id) ? '🔞 Jeu privé pour adultes' : 'Partie rapide' }), h('b', { text: game.title }),
+            h('div', { class: 'prog-txt' }, h('small', { text: cat.tv.some((g) => g.id === game.id) ? '📺 Jeu télé' : cat.board.some((g) => g.id === game.id) ? 'Jeu de plateau' : cat.cards.some((g) => g.id === game.id) ? 'Jeu de cartes' : cat.adult.some((g) => g.id === game.id) ? '🔞 Jeu privé pour adultes' : 'Partie rapide' }), h('b', { text: game.title }),
               h('span', { text: game.rules }),
               h('em', { class: online < game.min ? 'warn' : '', text: `👥 ${game.players} · ⏱ ${game.duration}` })),
             changeBtn);
@@ -402,8 +402,8 @@ const VIEWS = {
             ? h('div', { class: 'row' }, ...cat.show.map((r) => chip(`${r.icon} ${r.title}`, se.rounds[r.id], () => send({ rounds: { ...se.rounds, [r.id]: !se.rounds[r.id] } }))))
             : '',
           usesQuiz ? themePicker(st, chip, send) : '',
-          se.format === 'quick' && se.game === 'couple' && !se.vote ? h('div', { class: 'row' }, h('span', { text: 'Niveau' }),
-            ...Object.entries(cat.coupleLevels).map(([k, l]) => chip(`${l.icon} ${l.label}`, se.coupleLevel === k, () => send({ coupleLevel: k })))) : '',
+          se.format === 'quick' && cat.adult.some((g) => g.id === se.game) && !se.vote ? h('div', { class: 'row' }, h('span', { text: se.game === 'brulant' ? 'Jusqu’à' : 'Niveau' }),
+            ...Object.entries(cat.coupleLevels).map(([k, l], i) => chip(se.game === 'brulant' ? ['🌶️ Sensuel', '🌶️🌶️ Coquin', '🌶️🌶️🌶️ Osé'][i] : `${l.icon} ${l.label}`, se.coupleLevel === k, () => send({ coupleLevel: k })))) : '',
           h('div', { class: 'row' }, h('span', { text: 'Durée' }),
             chip('Courte', se.length === 'short', () => send({ length: 'short' })),
             chip('Normale', se.length === 'normal', () => send({ length: 'normal' })),
@@ -411,7 +411,7 @@ const VIEWS = {
           h('div', { class: 'row' }, h('span', { text: 'Choix du jeu' }),
             chip('🗳️ Vote des joueurs', se.vote, () => send({ vote: true })),
             chip('🎛️ Je choisis', !se.vote, () => send({ vote: false }))),
-          se.format === 'quick' && se.game === 'couple' && !se.vote ? h('div', { class: 'row' }, h('span', { text: 'Photos' }), h('small', { text: '🔒 Aucune photo ni historique pour ce jeu privé' }))
+          se.format === 'quick' && cat.adult.some((g) => g.id === se.game) && !se.vote ? h('div', { class: 'row' }, h('span', { text: 'Photos' }), h('small', { text: '🔒 Aucune photo ni historique pour ce jeu privé' }))
             : h('div', { class: 'row' }, h('span', { text: 'Photos' }),
               chip('📸 Autorisées', se.photos, () => send({ photos: true })),
               chip('🚫 Désactivées', !se.photos, () => send({ photos: false }))),
@@ -685,6 +685,7 @@ function openPicker(st) {
         h('span', { class: 'show-ic', text: '🎬' }),
         h('span', { class: 'show-txt' }, h('b', { text: 'Le Grand Show' }), h('span', { text: 'Plusieurs manches et un podium final.' }))),
       h('h3', { class: 'family', text: '⚡ Parties rapides' }), h('div', { class: 'tile-grid' }, ...cat.quick.map((g) => tile(g))),
+      h('h3', { class: 'family', text: '📺 Jeux télé' }), h('div', { class: 'tile-grid' }, ...cat.tv.map((g) => tile(g))),
       h('h3', { class: 'family', text: '🎲 Jeux de plateau' }), h('div', { class: 'tile-grid' }, ...cat.board.map((g) => tile(g))),
       h('h3', { class: 'family', text: '🃏 Jeux de cartes' }), h('div', { class: 'tile-grid' }, ...cat.cards.map((g) => tile(g))),
       h('h3', { class: 'family', text: '🔞 Pour adultes' }), h('div', { class: 'tile-grid' }, ...cat.adult.map((g) => tile(g, true)))));

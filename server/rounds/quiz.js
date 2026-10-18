@@ -1,6 +1,6 @@
 ﻿// Manche « Le Grand Quiz » : 4 réponses, la rapidité rapporte des points.
 const animator = require('../animator');
-const { CATEGORIES, QUESTIONS } = require('../content/questions');
+const { CATEGORIES, QUESTIONS, DEFAULT_CATEGORIES } = require('../content/questions');
 const { shuffle } = require('../util');
 
 const QUESTION_MS = 20_000;
@@ -13,18 +13,14 @@ function pickQuestions(room, n) {
   const used = room.ctx.usedQuestions;
   const cats = room.settings.categories;
   const clubs = room.settings.clubs || [];
-  // Thèmes choisis (et clubs choisis pour « Clubs de L1 ») ; le thème adulte n'est jamais ajouté en complément.
+  // Uniquement les thèmes choisis (et les clubs choisis pour « Clubs de L1 ») : jamais de question d'un autre thème.
   const chosen = (q) => cats.includes(q.cat) && (q.cat !== 'clubs' || !clubs.length || clubs.includes(q.club));
-  const allowed = (q) => !CATEGORIES[q.cat].adult || cats.includes(q.cat);
-  let pool = QUESTIONS.filter((q) => chosen(q) && !used.has(q.q));
-  if (pool.length < n) {
-    // Complément : d'abord des thèmes de la même famille (ex. Lens seul → autres clubs, foot), puis le reste.
-    const groups = new Set(cats.map((c) => CATEGORIES[c].group));
-    const extra = shuffle(QUESTIONS.filter((q) => !chosen(q) && allowed(q) && !used.has(q.q)))
-      .sort((a, b) => Number(groups.has(CATEGORIES[b.cat].group)) - Number(groups.has(CATEGORIES[a.cat].group)));
-    pool = [...pool, ...extra.slice(0, n - pool.length)];
-  }
-  if (pool.length < n) { used.clear(); pool = QUESTIONS.filter(allowed); }
+  let all = QUESTIONS.filter(chosen);
+  if (!all.length) all = QUESTIONS.filter((q) => DEFAULT_CATEGORIES.includes(q.cat)); // aucun thème valable : thèmes par défaut
+  const fresh = shuffle(all.filter((q) => !used.has(q.q)));
+  // Thèmes épuisés pendant la soirée : on complète avec des questions déjà posées de ces mêmes thèmes.
+  const again = shuffle(all.filter((q) => used.has(q.q)));
+  let pool = [...fresh, ...again.slice(0, Math.max(0, n - fresh.length))];
   pool = shuffle(pool);
   const byCat = new Map();
   for (const q of pool) { if (!byCat.has(q.cat)) byCat.set(q.cat, []); byCat.get(q.cat).push(q); }

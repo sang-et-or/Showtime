@@ -16,7 +16,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Phases où l'on attend les joueurs : l'hôte n'appuie pas sur « Suivant » pendant celles-ci.
 const INPUT = new Set(['writing', 'quizQuestion', 'whoVote', 'defiGet', 'defiAct', 'defiVote', 'duelBet', 'duelQ',
   'bacWrite', 'bacReview', 'undVote', 'penduPlay', 'estAsk', 'ludoPlay', 'rouePlay', 'roueQ', 'vieTurn', 'moisTurn',
-  'batFlip', 'bjBet', 'bjPlay', 'pkPlay', 'blBid', 'blPlay', 'prPlay', 'htPlay']);
+  'batFlip', 'bjBet', 'bjPlay', 'pkPlay', 'blBid', 'blPlay', 'prPlay', 'htPlay', 'motusPlay', 'mpmClue', 'mpmGuess', 'sdAsk', 'rlTurn', 'ileChallenge', 'ileVote', 'ileCouncil', 'tzWrite', 'tzJudge']);
+// Jeux où des robots qui répondent au hasard peuvent légitimement finir à zéro point.
+const MAY_BE_ZERO = new Set(['motpourmot', 'rouelettres']);
 
 async function main() {
   const server = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'index.js')], { env: { ...process.env, PORT: String(PORT), SHOWTIME_GAME_CAP_MS: '30000' }, stdio: ['ignore', 'ignore', 'inherit'] });
@@ -81,6 +83,7 @@ async function main() {
     }
 
     const QUICK = { quiz: ['quizQuestion', 'quizReveal'], petitbac: ['bacWrite', 'bacReview', 'bacReveal'], undercover: ['undClues', 'undVote', 'undReveal', 'undEnd'], pendu: ['penduPlay', 'penduReveal'], estimation: ['estAsk', 'estReveal'],
+      motus: ['motusPlay', 'motusReveal'], motpourmot: ['mpmClue', 'mpmGuess', 'mpmReveal'], sondage: ['sdAsk', 'sdReveal'], rouelettres: ['rlTurn', 'rlReveal'], ile: ['ileIntro', 'ileChallenge', 'ileResult', 'ileEnd'], tourtereaux: ['tzWrite', 'tzReveal'],
       ludo: ['ludoPlay', 'ludoEnd'], roue: ['rouePlay', 'roueQ', 'roueA', 'roueEnd'], vie: ['vieTurn', 'vieEvent', 'vieEnd'], mois: ['moisTurn', 'moisEvent', 'moisEnd'],
       bataille: ['batFlip', 'batReveal', 'batEnd'], blackjack: ['bjBet', 'bjPlay', 'bjDealer', 'bjResult', 'bjEnd'], poker: ['pkPlay', 'pkShow', 'pkEnd'],
       belote: ['blBid', 'blPlay', 'blEnd'], president: ['prPlay', 'prResult', 'prEnd'], huit: ['htPlay', 'htResult', 'htEnd'] };
@@ -93,7 +96,7 @@ async function main() {
     host.emit('host:action', { type: 'start' });
       const ph = await playUntilFinal(`Partie rapide ${game}`);
       assert(expected.every((p) => ph.includes(p)), `Partie rapide ${game} : toutes les phases jouées`);
-      assert(hs.ranking.some((r) => r.score > 0), `Partie rapide ${game} : des points ont été marqués`);
+      if (!MAY_BE_ZERO.has(game)) assert(hs.ranking.some((r) => r.score > 0), `Partie rapide ${game} : des points ont été marqués`);
     }
     host.emit('host:action', { type: 'restart' });
     await sleep(300);
@@ -139,7 +142,33 @@ async function main() {
       assert(duo.every((b) => b.state.photos === false), 'Entre nous : photos désactivées sur les téléphones');
       cHost.close(); duo.forEach((b) => b.socket.close());
     }
-    console.log('\n🎉 Tous les tests sont passés.');
+    // Jeu privé « Brûlant » : mêmes garanties (écran principal neutre, rien d'enregistré, pas de photos).
+    if (!process.env.ONLY || process.env.ONLY.split(',').includes('brulant')) {
+      const bHost = io(URL, { transports: ['websocket'], forceNew: true });
+      let bs = null;
+      const bPhases = [];
+      const dump = [];
+      bHost.on('state', (s) => { bs = s; dump.push(JSON.stringify(s)); if (bPhases[bPhases.length - 1] !== s.phase) bPhases.push(s.phase); });
+      const c = await new Promise((r) => bHost.emit('host:create', { mode: 'local', format: 'quick', game: 'brulant' }, r));
+      const duo = [await startBot(URL, c.code, 0), await startBot(URL, c.code, 1)];
+      await sleep(200);
+      bHost.emit('host:action', { type: 'settings', settings: { format: 'quick', game: 'brulant', length: 'short', coupleLevel: 'audace' } });
+      await sleep(200);
+      bHost.emit('host:action', { type: 'start' });
+      const t0 = Date.now();
+      while (bs.phase !== 'final' && Date.now() - t0 < 240_000) {
+        if (bs.canSkip && !['brChoose', 'brCard'].includes(bs.phase)) bHost.emit('host:action', { type: 'skip' });
+        await sleep(250);
+      }
+      assert(bs.phase === 'final', `Brûlant : partie terminée en ${Math.round((Date.now() - t0) / 1000)} s`);
+      assert(['brChoose', 'brCard', 'brEnd'].every((p) => bPhases.includes(p)), 'Brûlant : toutes les phases jouées');
+      const { TRUTHS, DARES } = require('../server/rounds/brulant').CARDS;
+      const cards = [TRUTHS, DARES].flatMap((x) => Object.values(x).flat());
+      const all = dump.join('\n');
+      assert(!cards.some((t) => all.includes(JSON.stringify(t).slice(1, -1))), 'Brûlant : aucune carte n’apparaît sur l’écran principal');
+      assert(duo.every((b) => b.state.photos === false), 'Brûlant : photos désactivées sur les téléphones');
+      bHost.close(); duo.forEach((b) => b.socket.close());
+    }    console.log('\n🎉 Tous les tests sont passés.');
   } finally {
     server.kill();
   }

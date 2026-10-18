@@ -308,3 +308,22 @@ Une confirmation « adultes consentants » est demandée avant de l'ouvrir. Il n
   « Regardez vos téléphones ». **Rien n'est enregistré** (ni historique, ni souvenirs) et les **photos sont désactivées**.
 - Durée : courte (8 étapes), normale (12) ou longue (16). À la fin, chacun retrouve sur son téléphone la liste des envies partagées.
 - Contenus modifiables dans `server/content/couple.js`.
+## 10. Les jeux télé 📺
+
+Six jeux inspirés des grands formats de la télé, avec nos propres noms, plateaux et règles :
+
+| Jeu | Le principe |
+| --- | --- |
+| 🟥 **Lettre à Lettre** | La première lettre du mot est donnée. Chacun son tour, on propose un mot de la bonne longueur : case **rouge** = lettre bien placée, rond **jaune** = lettre mal placée. Six essais ; plus on trouve vite, plus ça rapporte. |
+| 🔺 **Mot pour Mot** | Un joueur voit un mot secret sur son téléphone et donne **un seul mot d’indice**. Les autres ont une réponse par indice. Trouvé au 1er indice : 400 points pour le devineur **et** pour celui qui fait deviner, puis 300, 200, 100. (2 joueurs minimum) |
+| 📊 **Le Grand Sondage** | « Nous avons demandé à 100 personnes… » Chacun tape ses réponses : la première personne qui découvre une réponse du tableau gagne ses points. 4 essais par question. Le sondage est imaginaire (nos propres chiffres). |
+| 🔠 **La Roue des Lettres** | Chacun son tour : on fait tourner la roue, on propose une consonne (chaque lettre trouvée vaut la somme de la roue), on achète une voyelle (250) ou on tente de résoudre. **Banqueroute** remet la cagnotte à zéro ! Celui qui résout gagne sa cagnotte + 300. |
+| 🏝️ **L’Île des Défis** | Deux tribus s’affrontent sur des épreuves au téléphone : la course aux noix de coco (tapez le plus vite possible), les poteaux (gardez le doigt appuyé, le dernier en place gagne) et le défi des sages (quiz). La tribu perdante vote **en secret** au conseil pour éliminer l’un des siens (qui rejoint le jury). Les survivants s’affrontent enfin sur les poteaux : le dernier debout gagne ! (4 joueurs minimum) |
+| 💕 **Les Tourtereaux** | Les joueurs forment des duos (un trio si le nombre est impair). À chaque manche, une question porte sur l’un des deux (« Quel est le plat préféré de Lou ? ») : il répond pour lui en secret, son partenaire devine. Réponses identiques : +200 chacun ! Si c’est presque pareil, les autres joueurs votent « ça compte ? » ; à deux, c’est la personne concernée qui valide. |
+
+On les trouve dans la famille « 📺 Jeux télé » de l’accueil et du menu des jeux, et les joueurs à distance peuvent voter pour eux.
+
+### Brûlant 🌶️ (Action ou Vérité coquin pour couple)
+Dans la famille « 🔞 Pour adultes ». À deux exactement, chacun sur son téléphone : on choisit **Action** ou **Vérité**, et la température monte au fil des tours (🌶️ sensuel → 🌶️🌶️ coquin → 🌶️🌶️🌶️ osé), sans dépasser le niveau choisi dans le salon (« Jusqu’à… »).
+Consentement : joker toujours possible, et le partenaire peut répondre **« Pas ce soir 🙅 »** à n’importe quelle action, sans pénalité.
+Confidentialité : comme pour « Entre nous », l’écran principal ne montre jamais les cartes, rien n’est enregistré et les photos sont désactivées. Confirmation 18+ à l’ouverture.

@@ -108,6 +108,56 @@ function startBot(url, code, index, { log = () => {}, speed = 1 } = {}) {
             }, (2600 + rnd(1500)) * speed);
           }
           break;
+        // ----- jeux télé -----
+        case 'motusPlay':
+          if (s.isTurn) {
+            const known = s.motus.known;
+            later(() => act({ type: 'word', text: known.map((l) => l || pickOne('EAISTNRULO'.split(''))).join('') }), 500, 1500);
+          }
+          break;
+        case 'mpmClue':
+          if (s.isGiver) later(() => act({ type: 'clue', text: pickOne(['soleil', 'grand', 'rouge', 'vite', 'animal', 'manger', 'jouer', 'froid', 'joie', 'nuit']) }), 500, 1500);
+          break;
+        case 'mpmGuess':
+          if (!s.isGiver && s.mine == null) later(() => act({ type: 'guess', text: pickOne(['plage', 'pizza', 'robot', 'lune', 'neige', 'lion', 'train', 'clown', 'avion', 'reine']) }), 400, 2000);
+          break;
+        case 'sdAsk':
+          for (let k = 0; k < 4; k++) later(() => act({ type: 'answer', text: pickOne(['vache', 'foot', 'cles', 'telephone', 'guitare', 'dormir', 'voiture', 'noir', 'superman', 'fraise', 'danser', 'serviette', 'pompier', 'italie', 'lire']) }), 600 + k * 1500, 1200);
+          break;
+        case 'rlTurn':
+          if (s.isTurn && s.stage === 'spin') {
+            const cons = 'RSTNLCDMPBGFVHQJXZKW'.split('').filter((l) => !s.rl.used.includes(l));
+            if (cons.length > 6 && Math.random() < 0.9) later(() => act({ type: 'spin' }), 300, 800);
+            else later(() => act({ type: 'solve', text: s.rl.cells.map((c) => c || 'E').join('') }), 300, 800);
+          }
+          if (s.isTurn && s.stage === 'letter') {
+            const cons = 'RSTNLCDMPBGFVHQJXZKW'.split('').filter((l) => !s.rl.used.includes(l));
+            if (cons.length) later(() => act({ type: 'letter', l: cons[0] }), 300, 700);
+          }
+          break;
+        case 'ileChallenge':
+          if (s.playing && s.stage === 'go') {
+            if (s.kind === 'tap') { let n = 0; const iv = setInterval(() => { n += 3 + rnd(4); act({ type: 'taps', n }); }, 450); setTimeout(() => clearInterval(iv), 9500); }
+            if (s.kind === 'hold') { later(() => act({ type: 'hold' }), 200, 1500); later(() => act({ type: 'release' }), 5000, 15000); }
+            if (s.q && s.myAnswer == null) later(() => act({ type: 'answer', choice: rnd(4) }), 400, 2500);
+          }
+          break;
+        case 'ileVote':
+          if (s.voter && !s.voted && s.candidates.length) later(() => act({ type: 'vote', target: pickOne(s.candidates).id }), 500, 2000);
+          break;
+        case 'tzWrite':
+          if (s.inGame && !s.done) later(() => act({ type: 'answer', text: pickOne(['pizza', 'la plage', 'chat', 'rouge', 'le chocolat', 'Titanic', 'voler', 'pompier']) }), 500, 2500);
+          break;
+        case 'tzJudge':
+          s.toJudge.forEach((p) => later(() => act({ type: 'judge', k: p.k, ok: Math.random() < 0.5 }), 300, 1500));
+          break;
+        case 'brChoose':
+          if (s.br.isMe) later(() => act({ type: Math.random() < 0.5 ? 'truth' : 'dare' }), 300, 800);
+          break;
+        case 'brCard':
+          if (!s.result && s.br.isMe) later(() => act({ type: Math.random() < 0.85 ? 'done' : 'joker' }), 600, 1200);
+          if (!s.result && !s.br.isMe && s.kind === 'dare' && Math.random() < 0.15) later(() => act({ type: 'veto' }), 200, 400);
+          break;
         case 'estAsk':
           if (s.mine == null) later(() => act({ type: 'guess', value: String(rnd(3000)) }));
           break;
